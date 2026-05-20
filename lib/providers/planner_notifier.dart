@@ -9,6 +9,7 @@ import '../models/task_fill_pattern.dart';
 import '../models/task_item.dart';
 import '../models/task_status.dart';
 import '../services/export_service.dart';
+import '../services/import_parser.dart';
 import '../services/storage_service.dart';
 import '../models/calendar_range.dart';
 import '../utils/calendar_dates.dart';
@@ -487,17 +488,35 @@ class PlannerNotifier extends ChangeNotifier {
     }
   }
 
-  void exportState() {
-    _export.downloadJson(_state);
-  }
+  Future<String?> exportState() => _export.saveProjectJson(_state);
 
   Future<String?> importState() async {
     try {
-      final imported = await _export.pickAndImport();
-      if (imported == null) return null;
-      _state = imported;
-      await _persist();
-      return null;
+      final parsed = await _export.pickAndParseImport();
+      if (parsed == null) return null;
+
+      switch (parsed.kind) {
+        case ImportKind.fullProject:
+          _state = parsed.project!;
+          await _persist();
+          return 'Проект импортирован';
+        case ImportKind.mergeTasks:
+          final tasks = parsed.tasks!;
+          if (tasks.isEmpty) return 'Файл не содержит задач';
+          final employeeIds = _state.employees.map((e) => e.id).toSet();
+          final prepared = prepareImportedTasks(
+            tasks,
+            employeeIds,
+            () => _uuid.v4(),
+          );
+          _state = _state.copyWith(
+            tasks: [..._state.tasks, ...prepared],
+          );
+          await _persist();
+          return 'Добавлено задач: ${prepared.length}';
+      }
+    } on FormatException catch (e) {
+      return e.message;
     } catch (e) {
       return 'Ошибка импорта: $e';
     }

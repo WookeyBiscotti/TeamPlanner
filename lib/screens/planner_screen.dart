@@ -31,14 +31,42 @@ class _PlannerScreenState extends State<PlannerScreen> {
     super.dispose();
   }
 
+  Future<void> _export(BuildContext context) async {
+    final notifier = context.read<PlannerNotifier>();
+    try {
+      final path = await notifier.exportState();
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            path != null
+                ? 'Проект экспортирован: $path'
+                : 'Экспорт отменён',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Ошибка экспорта: $e'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+      );
+    }
+  }
+
   Future<void> _import(BuildContext context) async {
     final notifier = context.read<PlannerNotifier>();
-    final error = await notifier.importState();
+    final message = await notifier.importState();
     if (!context.mounted) return;
+    final isError = message != null &&
+        !message.startsWith('Проект') &&
+        !message.startsWith('Добавлено');
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(error ?? 'Данные успешно импортированы'),
-        backgroundColor: error != null ? Theme.of(context).colorScheme.error : null,
+        content: Text(message ?? 'Импорт отменён'),
+        backgroundColor: isError ? Theme.of(context).colorScheme.error : null,
       ),
     );
   }
@@ -103,13 +131,13 @@ class _PlannerScreenState extends State<PlannerScreen> {
                 },
               ),
               IconButton(
-                icon: const Icon(Icons.upload),
-                tooltip: 'Экспорт',
-                onPressed: notifier.exportState,
+                icon: const Icon(Icons.save_alt),
+                tooltip: 'Экспорт в JSON',
+                onPressed: () => _export(context),
               ),
               IconButton(
-                icon: const Icon(Icons.download),
-                tooltip: 'Импорт',
+                icon: const Icon(Icons.folder_open),
+                tooltip: 'Импорт: проект или массив задач JSON',
                 onPressed: () => _import(context),
               ),
             ],

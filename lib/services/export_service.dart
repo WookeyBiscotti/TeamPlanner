@@ -3,23 +3,36 @@ import 'dart:convert';
 import 'package:file_picker/file_picker.dart';
 
 import '../models/planner_state.dart';
-import 'download_file_stub.dart'
-    if (dart.library.html) 'download_file_web.dart';
+import 'import_parser.dart';
+import 'save_json_file_stub.dart'
+    if (dart.library.html) 'save_json_file_web.dart'
+    if (dart.library.io) 'save_json_file_io.dart';
 
 class ExportService {
+  static const int formatVersion = 1;
+
+  Map<String, dynamic> exportPayload(PlannerState state) => {
+        'formatVersion': formatVersion,
+        'exportedAt': DateTime.now().toUtc().toIso8601String(),
+        ...state.toJson(),
+      };
+
   String exportToJson(PlannerState state) {
     const encoder = JsonEncoder.withIndent('  ');
-    return encoder.convert(state.toJson());
+    return encoder.convert(exportPayload(state));
   }
 
-  void downloadJson(PlannerState state) {
+  String defaultFilename() {
     final date = DateTime.now();
-    final filename =
-        'planner_export_${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}.json';
-    downloadFile(filename, exportToJson(state));
+    return 'planner_export_${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}.json';
   }
 
-  Future<PlannerState?> pickAndImport() async {
+  /// Saves project JSON to a file. Returns path or filename, or null if cancelled.
+  Future<String?> saveProjectJson(PlannerState state) {
+    return saveJsonFile(defaultFilename(), exportToJson(state));
+  }
+
+  Future<dynamic> pickJsonFile() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['json'],
@@ -31,7 +44,12 @@ class ExportService {
     final bytes = file.bytes;
     if (bytes == null) return null;
 
-    final decoded = jsonDecode(utf8.decode(bytes)) as Map<String, dynamic>;
-    return PlannerState.fromJson(decoded);
+    return jsonDecode(utf8.decode(bytes));
+  }
+
+  Future<ImportParseResult?> pickAndParseImport() async {
+    final decoded = await pickJsonFile();
+    if (decoded == null) return null;
+    return parseImportJson(decoded);
   }
 }
