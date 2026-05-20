@@ -8,6 +8,7 @@ import '../models/timeline_scale.dart';
 import '../models/task_fill_pattern.dart';
 import '../models/task_item.dart';
 import '../models/task_status.dart';
+import '../models/parsed_task_import.dart';
 import '../services/export_service.dart';
 import '../services/import_parser.dart';
 import '../services/storage_service.dart';
@@ -490,36 +491,42 @@ class PlannerNotifier extends ChangeNotifier {
 
   Future<String?> exportState() => _export.saveProjectJson(_state);
 
-  Future<String?> importState() async {
-    try {
-      final parsed = await _export.pickAndParseImport();
-      if (parsed == null) return null;
+  Future<ImportParseResult?> pickAndParseImport() =>
+      _export.pickAndParseImport();
 
-      switch (parsed.kind) {
-        case ImportKind.fullProject:
-          _state = parsed.project!;
-          await _persist();
-          return 'Проект импортирован';
-        case ImportKind.mergeTasks:
-          final tasks = parsed.tasks!;
-          if (tasks.isEmpty) return 'Файл не содержит задач';
-          final employeeIds = _state.employees.map((e) => e.id).toSet();
-          final prepared = prepareImportedTasks(
-            tasks,
-            employeeIds,
-            () => _uuid.v4(),
-          );
-          _state = _state.copyWith(
-            tasks: [..._state.tasks, ...prepared],
-          );
-          await _persist();
-          return 'Добавлено задач: ${prepared.length}';
-      }
-    } on FormatException catch (e) {
-      return e.message;
-    } catch (e) {
-      return 'Ошибка импорта: $e';
-    }
+  Future<String?> importFullProject(PlannerState project) async {
+    _state = project;
+    await _persist();
+    return 'Проект импортирован';
+  }
+
+  List<String> employeeNamesNeedingMapping(List<ParsedTaskImport> parsed) {
+    final projectIds = _state.employees.map((e) => e.id).toSet();
+    return collectImportEmployeeNames(parsed, projectIds);
+  }
+
+  Map<String, String?> suggestEmployeeMappingForImport(List<String> importNames) =>
+      suggestEmployeeMapping(importNames, _state.employees);
+
+  Future<String?> mergeImportedTasks(
+    List<ParsedTaskImport> parsed,
+    Map<String, String?> employeeNameMapping,
+  ) async {
+    if (parsed.isEmpty) return 'Файл не содержит задач';
+    final projectIds = _state.employees.map((e) => e.id).toSet();
+    final mapped = applyEmployeeNameMapping(
+      parsed,
+      employeeNameMapping,
+      projectIds,
+    );
+    final prepared = prepareImportedTasks(
+      mapped,
+      projectIds,
+      () => _uuid.v4(),
+    );
+    _state = _state.copyWith(tasks: [..._state.tasks, ...prepared]);
+    await _persist();
+    return 'Добавлено задач: ${prepared.length}';
   }
 
   List<TaskItem> scheduledTasksForEmployee(String employeeId) {

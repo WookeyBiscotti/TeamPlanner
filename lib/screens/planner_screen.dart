@@ -5,7 +5,9 @@ import '../models/planner_main_view.dart';
 import '../models/timeline_scale.dart';
 import '../providers/planner_notifier.dart';
 import '../providers/theme_notifier.dart';
+import '../services/import_parser.dart';
 import '../widgets/calendar_settings_dialog.dart';
+import '../widgets/employee_import_mapping_dialog.dart';
 import '../widgets/employee_sidebar.dart';
 import '../widgets/gantt_chart.dart';
 import '../widgets/relations_view.dart';
@@ -58,14 +60,63 @@ class _PlannerScreenState extends State<PlannerScreen> {
 
   Future<void> _import(BuildContext context) async {
     final notifier = context.read<PlannerNotifier>();
-    final message = await notifier.importState();
-    if (!context.mounted) return;
-    final isError = message != null &&
-        !message.startsWith('Проект') &&
-        !message.startsWith('Добавлено');
+    try {
+      final parsed = await notifier.pickAndParseImport();
+      if (!context.mounted) return;
+      if (parsed == null) {
+        _showImportSnack(context, 'Импорт отменён', isError: false);
+        return;
+      }
+
+      if (parsed.kind == ImportKind.fullProject) {
+        final message =
+            await notifier.importFullProject(parsed.project!);
+        if (!context.mounted) return;
+        _showImportSnack(context, message!, isError: false);
+        return;
+      }
+
+      final parsedTasks = parsed.parsedTasks!;
+      final importNames = notifier.employeeNamesNeedingMapping(parsedTasks);
+
+      Map<String, String?> mapping = {};
+      if (importNames.isNotEmpty) {
+        mapping = notifier.suggestEmployeeMappingForImport(importNames);
+        final confirmed = await showEmployeeImportMappingDialog(
+          context,
+          importNames: importNames,
+          projectEmployees: notifier.state.employees,
+          initialMapping: mapping,
+        );
+        if (!context.mounted) return;
+        if (confirmed == null) {
+          _showImportSnack(context, 'Импорт отменён', isError: false);
+          return;
+        }
+        mapping = confirmed;
+      }
+
+      final message =
+          await notifier.mergeImportedTasks(parsedTasks, mapping);
+      if (!context.mounted) return;
+      _showImportSnack(context, message!, isError: false);
+    } on FormatException catch (e) {
+      if (!context.mounted) return;
+      _showImportSnack(context, e.message, isError: true);
+    } catch (e) {
+      if (!context.mounted) return;
+      _showImportSnack(context, 'Ошибка импорта: $e', isError: true);
+    }
+  }
+
+  void _showImportSnack(
+    BuildContext context,
+    String message, {
+    required bool isError,
+  }) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message ?? 'Импорт отменён'),
+        content: Text(message),
         backgroundColor: isError ? Theme.of(context).colorScheme.error : null,
       ),
     );

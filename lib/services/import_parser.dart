@@ -1,5 +1,8 @@
+import '../models/employee.dart';
+import '../models/parsed_task_import.dart';
 import '../models/planner_state.dart';
 import '../models/task_item.dart';
+import '../utils/task_colors.dart';
 
 enum ImportKind { fullProject, mergeTasks }
 
@@ -7,18 +10,18 @@ class ImportParseResult {
   const ImportParseResult._({
     required this.kind,
     this.project,
-    this.tasks,
+    this.parsedTasks,
   });
 
   final ImportKind kind;
   final PlannerState? project;
-  final List<TaskItem>? tasks;
+  final List<ParsedTaskImport>? parsedTasks;
 
   factory ImportParseResult.fullProject(PlannerState state) =>
       ImportParseResult._(kind: ImportKind.fullProject, project: state);
 
-  factory ImportParseResult.mergeTasks(List<TaskItem> tasks) =>
-      ImportParseResult._(kind: ImportKind.mergeTasks, tasks: tasks);
+  factory ImportParseResult.mergeTasks(List<ParsedTaskImport> tasks) =>
+      ImportParseResult._(kind: ImportKind.mergeTasks, parsedTasks: tasks);
 }
 
 ImportParseResult parseImportJson(dynamic decoded) {
@@ -27,12 +30,20 @@ ImportParseResult parseImportJson(dynamic decoded) {
   }
   if (decoded is Map) {
     final map = Map<String, dynamic>.from(decoded);
-    if (map.containsKey('timelineStart') || map.containsKey('employees')) {
+    if (map.containsKey('timelineStart')) {
       return ImportParseResult.fullProject(PlannerState.fromJson(map));
     }
     final tasksJson = map['tasks'];
     if (tasksJson is List) {
-      return ImportParseResult.mergeTasks(parseTasksJsonList(tasksJson));
+      return ImportParseResult.mergeTasks(
+        parseTasksJsonList(
+          tasksJson,
+          fileEmployeeNames: _parseFileEmployees(map['employees']),
+        ),
+      );
+    }
+    if (map.containsKey('employees')) {
+      return ImportParseResult.fullProject(PlannerState.fromJson(map));
     }
   }
   throw const FormatException(
@@ -40,26 +51,153 @@ ImportParseResult parseImportJson(dynamic decoded) {
   );
 }
 
-List<TaskItem> parseTasksJsonList(List<dynamic> list) {
+Map<String, String>? _parseFileEmployees(dynamic employeesJson) {
+  if (employeesJson is! List) return null;
+  final map = <String, String>{};
+  for (final item in employeesJson) {
+    if (item is! Map) continue;
+    final id = item['id'] as String?;
+    final name = item['name'] as String?;
+    if (id != null && name != null && name.trim().isNotEmpty) {
+      map[id] = name.trim();
+    }
+  }
+  return map.isEmpty ? null : map;
+}
+
+List<ParsedTaskImport> parseTasksJsonList(
+  List<dynamic> list, {
+  Map<String, String>? fileEmployeeNames,
+}) {
   if (list.isEmpty) {
     throw const FormatException('Список задач пуст');
   }
-  final tasks = <TaskItem>[];
+  final tasks = <ParsedTaskImport>[];
   for (var i = 0; i < list.length; i++) {
     final item = list[i];
     if (item is! Map) {
       throw FormatException('Элемент $i: ожидается объект задачи');
     }
     final map = Map<String, dynamic>.from(item);
-    if (map['title'] == null || '$map[title]'.trim().isEmpty) {
+    if (map['title'] == null || '${map['title']}'.trim().isEmpty) {
       throw FormatException('Элемент $i: поле title обязательно');
     }
     if (map['id'] == null) {
       map['id'] = 'import-temp-$i';
     }
-    tasks.add(TaskItem.fromJson(map));
+    final employeeId = map['employeeId'] as String?;
+    var sourceName = _readEmployeeName(map);
+    if ((sourceName == null || sourceName.isEmpty) &&
+        employeeId != null &&
+        fileEmployeeNames != null) {
+      sourceName = fileEmployeeNames[employeeId];
+    }
+    if ((sourceName == null || sourceName.isEmpty) &&
+        employeeId != null &&
+        (fileEmployeeNames == null ||
+            !fileEmployeeNames.containsKey(employeeId))) {
+      sourceName = employeeId;
+    }
+    tasks.add(
+      ParsedTaskImport(
+        task: TaskItem.fromJson(map),
+        employeeName: sourceName?.trim().isEmpty ?? true
+            ? null
+            : sourceName?.trim(),
+      ),
+    );
   }
   return tasks;
+}
+
+String? _readEmployeeName(Map<String, dynamic> map) {
+  for (final key in ['employeeName', 'employee', 'assignee', 'исполнитель']) {
+    final value = map[key];
+    if (value is String && value.trim().isNotEmpty) {
+      return value.trim();
+    }
+  }
+  return null;
+}
+
+/// Unique labels from the file that should be mapped to project employees.
+List<String> collectImportEmployeeNames(
+  List<ParsedTaskImport> imports,
+  Set<String> projectEmployeeIds,
+) {
+  final names = <String>{};
+  for (final entry in imports) {
+    final key = mappingKeyFor(entry, projectEmployeeIds);
+    if (key != null) names.add(key);
+  }
+  return names.toList()..sort();
+}
+
+String? mappingKeyFor(
+  ParsedTaskImport entry,
+  Set<String> projectEmployeeIds,
+) {
+  final task = entry.task;
+  if (task.employeeId != null &&
+      projectEmployeeIds.contains(task.employeeId) &&
+      (entry.employeeName == null || entry.employeeName!.isEmpty)) {
+    return null;
+  }
+  final name = entry.employeeName?.trim();
+  if (name != null && name.isNotEmpty) return name;
+  if (task.employeeId != null && !projectEmployeeIds.contains(task.employeeId)) {
+    return task.employeeId;
+  }
+  return null;
+}
+
+Map<String, String?> suggestEmployeeMapping(
+  List<String> importNames,
+  List<Employee> projectEmployees,
+) {
+  final result = <String, String?>{};
+  for (final name in importNames) {
+    final normalized = name.trim().toLowerCase();
+    final matches = projectEmployees
+        .where((e) => e.name.trim().toLowerCase() == normalized)
+        .toList();
+    result[name] = matches.length == 1 ? matches.first.id : null;
+  }
+  return result;
+}
+
+List<TaskItem> applyEmployeeNameMapping(
+  List<ParsedTaskImport> imports,
+  Map<String, String?> nameToEmployeeId,
+  Set<String> projectEmployeeIds,
+) {
+  return [
+    for (final entry in imports)
+      _applyMapping(entry, nameToEmployeeId, projectEmployeeIds),
+  ];
+}
+
+TaskItem _applyMapping(
+  ParsedTaskImport entry,
+  Map<String, String?> nameToEmployeeId,
+  Set<String> projectEmployeeIds,
+) {
+  final key = mappingKeyFor(entry, projectEmployeeIds);
+  if (key == null) {
+    final id = entry.task.employeeId;
+    if (id != null && projectEmployeeIds.contains(id)) {
+      return entry.task.copyWith(color: colorForEmployee(id));
+    }
+    return entry.task;
+  }
+  final employeeId = nameToEmployeeId[key];
+  if (employeeId == null) {
+    return entry.task.copyWith(clearEmployeeId: true, clearStart: true);
+  }
+  return entry.task.copyWith(
+    employeeId: employeeId,
+    color: colorForEmployee(employeeId),
+  );
 }
 
 /// Assigns new ids and rewires parent/blocker links within [imported].

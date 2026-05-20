@@ -1,4 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:planner/models/employee.dart';
+import 'package:planner/models/parsed_task_import.dart';
 import 'package:planner/models/planner_state.dart';
 import 'package:planner/models/task_item.dart';
 import 'package:planner/services/import_parser.dart';
@@ -11,10 +13,34 @@ void main() {
     ]);
 
     expect(result.kind, ImportKind.mergeTasks);
-    expect(result.tasks, hasLength(2));
-    expect(result.tasks![0].title, 'Задача A');
-    expect(result.tasks![1].title, 'Задача B');
-    expect(result.tasks![1].id, isNotEmpty);
+    expect(result.parsedTasks, hasLength(2));
+    expect(result.parsedTasks![0].task.title, 'Задача A');
+    expect(result.parsedTasks![1].task.title, 'Задача B');
+  });
+
+  test('parses employeeName from task', () {
+    final result = parseImportJson([
+      {
+        'id': 'a',
+        'title': 'T',
+        'employeeName': 'Иван',
+      },
+    ]);
+
+    expect(result.parsedTasks!.single.employeeName, 'Иван');
+  });
+
+  test('resolves employee name from file employees list', () {
+    final result = parseImportJson({
+      'employees': [
+        {'id': 'e1', 'name': 'Мария'},
+      ],
+      'tasks': [
+        {'id': 't1', 'title': 'Task', 'employeeId': 'e1'},
+      ],
+    });
+
+    expect(result.parsedTasks!.single.employeeName, 'Мария');
   });
 
   test('parses full project export', () {
@@ -33,7 +59,56 @@ void main() {
     });
 
     expect(result.kind, ImportKind.mergeTasks);
-    expect(result.tasks, hasLength(1));
+    expect(result.parsedTasks, hasLength(1));
+  });
+
+  test('collectImportEmployeeNames skips valid project ids', () {
+    const imports = [
+      ParsedTaskImport(
+        task: TaskItem(id: '1', title: 'T', employeeId: 'emp-1'),
+      ),
+    ];
+    expect(collectImportEmployeeNames(imports, {'emp-1'}), isEmpty);
+  });
+
+  test('collectImportEmployeeNames includes unknown names', () {
+    const imports = [
+      ParsedTaskImport(
+        task: TaskItem(id: '1', title: 'T'),
+        employeeName: 'Внешний',
+      ),
+    ];
+    expect(collectImportEmployeeNames(imports, {'emp-1'}), ['Внешний']);
+  });
+
+  test('suggestEmployeeMapping matches by name', () {
+    const employees = [
+      Employee(id: 'e1', name: 'Алексей'),
+      Employee(id: 'e2', name: 'Мария'),
+    ];
+    final mapping = suggestEmployeeMapping(['алексей', 'Пётр'], employees);
+    expect(mapping['алексей'], 'e1');
+    expect(mapping['Пётр'], isNull);
+  });
+
+  test('applyEmployeeNameMapping assigns project employee', () {
+    final imports = [
+      ParsedTaskImport(
+        task: TaskItem(
+          id: '1',
+          title: 'T',
+          start: DateTime(2025, 6, 2),
+        ),
+        employeeName: 'Иван',
+      ),
+    ];
+    final tasks = applyEmployeeNameMapping(
+      imports,
+      {'Иван': 'emp-1'},
+      {'emp-1'},
+    );
+    expect(tasks.single.employeeId, 'emp-1');
+    expect(tasks.single.start, isNotNull);
   });
 
   test('prepareImportedTasks remaps ids and relations', () {
