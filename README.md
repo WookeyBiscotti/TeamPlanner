@@ -18,8 +18,10 @@ samples, guidance on mobile development, and a full API reference.
 
 ## GitHub Pages
 
-При каждом push в `master` workflow [deploy-gh-pages.yml](.github/workflows/deploy-gh-pages.yml) собирает Flutter Web и публикует артефакты в ветку `gh-pages`.
+При каждом push в `master` или `main` workflow [deploy-gh-pages.yml](.github/workflows/deploy-gh-pages.yml) собирает Flutter Web и публикует артефакты в ветку `gh-pages`.
 
-Один раз включите Pages в репозитории: **Settings → Pages → Build and deployment → Deploy from a branch**, ветка `gh-pages`, папка `/ (root)`.
+**Важно:** в **Settings → Pages → Build and deployment** источник должен быть **Deploy from a branch**, ветка **`gh-pages`**, папка **`/ (root)`**.
+
+Не выбирайте `main` или `master` — там только исходники, без сборки Flutter. Если в интерфейсе написано «ветка main», это часто означает старую настройку на основную ветку; переключите явно на `gh-pages`.
 
 Сайт: https://wookeybiscotti.github.io/TeamPlanner/
