@@ -211,6 +211,11 @@ class _PlannerScreenState extends State<PlannerScreen> {
                         label: Text(PlannerMainView.relations.label),
                         icon: const Icon(Icons.account_tree),
                       ),
+                      ButtonSegment(
+                        value: PlannerMainView.tasks,
+                        label: Text(PlannerMainView.tasks.label),
+                        icon: const Icon(Icons.checklist),
+                      ),
                     ],
                     selected: {_mainView},
                     onSelectionChanged: (selected) {
@@ -220,35 +225,36 @@ class _PlannerScreenState extends State<PlannerScreen> {
                 ),
               ),
               Expanded(
-                child: isTimeline
-                    ? Row(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          EmployeeSidebar(
+                child: switch (_mainView) {
+                  PlannerMainView.timeline => Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        EmployeeSidebar(
+                          verticalScrollController: _verticalScrollController,
+                        ),
+                        const VerticalDivider(width: 1),
+                        Expanded(
+                          child: GanttChart(
                             verticalScrollController: _verticalScrollController,
+                            horizontalScrollController:
+                                _horizontalScrollController,
+                            onTaskSelected: (id) =>
+                                setState(() => _selectedTaskId = id),
                           ),
-                          const VerticalDivider(width: 1),
-                          Expanded(
-                            child: GanttChart(
-                              verticalScrollController: _verticalScrollController,
-                              horizontalScrollController:
-                                  _horizontalScrollController,
-                              onTaskSelected: (id) =>
-                                  setState(() => _selectedTaskId = id),
-                            ),
-                          ),
-                        ],
-                      )
-                    : RelationsView(
-                        selectedTaskId: _selectedTaskId,
-                        onTaskSelected: (id) =>
-                            setState(() => _selectedTaskId = id),
-                      ),
-              ),
-              ResizableTasksSection(
-                selectedTaskId: _selectedTaskId,
-                onSelectedTaskIdChanged: (id) =>
-                    setState(() => _selectedTaskId = id),
+                        ),
+                      ],
+                    ),
+                  PlannerMainView.relations => RelationsView(
+                      selectedTaskId: _selectedTaskId,
+                      onTaskSelected: (id) =>
+                          setState(() => _selectedTaskId = id),
+                    ),
+                  PlannerMainView.tasks => TasksPanel(
+                      selectedTaskId: _selectedTaskId,
+                      onSelectedTaskIdChanged: (id) =>
+                          setState(() => _selectedTaskId = id),
+                    ),
+                },
               ),
             ],
           ),

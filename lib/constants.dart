@@ -11,9 +11,6 @@ const int kTimelinePastHours = 336; // 2 weeks in hour scale
 const int kTimelinePastDays = 56; // 8 weeks in day scale
 const int kDefaultPixelsPerHour = 24;
 const int kDefaultPixelsPerDay = 64;
-const double kTasksPanelDefaultHeight = 280;
-const double kTasksPanelMinHeight = 140;
-const double kTasksPanelMaxHeight = 640;
 const double kTasksListWidth = 280;
 
 /// Minimum row height; grows when stacked task lanes are needed.
