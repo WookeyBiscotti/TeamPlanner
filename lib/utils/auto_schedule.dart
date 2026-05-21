@@ -243,10 +243,9 @@ class _ScheduleEffort {
   final bool clearWorkingDays;
 }
 
-/// Days vs hours for [estimateWorkingDays] (backlog tasks often keep default 4h duration).
 DurationUnit _autoScheduleUnit(TaskItem task) {
   if (task.usesWorkingDays) return DurationUnit.days;
-  final est = task.estimateWorkingDays;
+  final est = task.estimateWorkingDays ?? task.actualWorkingDays;
   if (est == null || est <= 0) return durationUnitForTask(task);
   if (task.duration.inHours == est && task.duration.inHours < 24) {
     return DurationUnit.hours;
@@ -255,18 +254,16 @@ DurationUnit _autoScheduleUnit(TaskItem task) {
 }
 
 _ScheduleEffort _scheduleEffort(TaskItem task, DurationUnit unit) {
-  final raw = task.estimateWorkingDays!;
+  final amount = effortAmountForTask(task, unit).clamp(1, 999);
   if (unit == DurationUnit.hours) {
-    final hours = raw.clamp(1, 999);
     return _ScheduleEffort(
-      duration: Duration(hours: hours),
+      duration: Duration(hours: amount),
       clearWorkingDays: true,
     );
   }
-  final days = raw.clamp(1, 999);
   return _ScheduleEffort(
-    duration: Duration(hours: 8 * days),
-    workingDays: days,
+    duration: Duration(hours: 8 * amount),
+    workingDays: amount,
   );
 }
 
@@ -274,7 +271,8 @@ String _noSchedulableTasksMessage(List<TaskItem> tasks) {
   final withEstimate =
       tasks.where((t) => taskHasEstimate(t)).toList(growable: false);
   if (withEstimate.isEmpty) {
-    return 'Нет задач с оценкой — укажите оценку в карточке задачи';
+    return 'Нет задач с оценкой — укажите оценку, факт или длительность '
+        '(раб. дн.) в карточке задачи';
   }
 
   final open = withEstimate

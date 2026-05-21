@@ -224,6 +224,27 @@ void main() {
     expect(result.scheduledCount, 0);
   });
 
+  test('schedules task with timeline workingDays only', () {
+    final state = baseState([
+      TaskItem(
+        id: 't1',
+        title: 'On timeline',
+        employeeId: 'e1',
+        start: timelineStart.add(const Duration(hours: 9)),
+        duration: const Duration(hours: 24),
+        workingDays: 3,
+      ),
+    ]);
+
+    final result = computeAutoSchedule(state);
+    expect(result.ok, isTrue);
+    expect(result.scheduledCount, 1);
+    expect(
+      result.tasks.firstWhere((t) => t.id == 't1').workingDays,
+      3,
+    );
+  });
+
   test('plans when blocker has estimate', () {
     final state = baseState([
       const TaskItem(
