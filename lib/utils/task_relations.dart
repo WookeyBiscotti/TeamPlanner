@@ -1,6 +1,6 @@
 import '../models/planner_state.dart';
 import '../models/task_item.dart';
-import '../models/task_list_filter.dart';
+import 'task_schedule_fields.dart';
 import '../models/task_status.dart';
 import 'timeline_layout.dart';
 import 'working_days.dart';

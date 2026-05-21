@@ -140,6 +140,8 @@ class PlannerNotifier extends ChangeNotifier {
     Duration? duration,
     int? workingDays,
     bool clearWorkingDays = false,
+    String? effortUnit,
+    bool clearEffortUnit = false,
   }) async {
     final index = _state.tasks.indexWhere((t) => t.id == id);
     if (index < 0) return;
@@ -160,6 +162,8 @@ class PlannerNotifier extends ChangeNotifier {
       duration: duration,
       workingDays: workingDays,
       clearWorkingDays: clearWorkingDays,
+      effortUnit: effortUnit,
+      clearEffortUnit: clearEffortUnit,
     );
     if (updated.isOnTimeline) {
       updated = updated.copyWith(

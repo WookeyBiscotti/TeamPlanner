@@ -19,6 +19,7 @@ class TaskItem {
     this.status = TaskStatus.open,
     this.estimateWorkingDays,
     this.actualWorkingDays,
+    this.effortUnit,
   });
 
   final String id;
@@ -39,10 +40,12 @@ class TaskItem {
   /// This task cannot start until all listed tasks are completed.
   final List<String> blockedByIds;
   final TaskStatus status;
-  /// Planned effort in working days (Mon–Fri).
+  /// Трудозатраты → Оценка (раб. дни или часы — см. [effortUnit]).
   final int? estimateWorkingDays;
-  /// Time actually spent, in working days.
+  /// Трудозатраты → Фактическое время.
   final int? actualWorkingDays;
+  /// `hours` or `days` — unit for [estimateWorkingDays] / [actualWorkingDays].
+  final String? effortUnit;
 
   bool get isAssigned => employeeId != null;
 
@@ -78,6 +81,8 @@ class TaskItem {
     bool clearEstimateWorkingDays = false,
     int? actualWorkingDays,
     bool clearActualWorkingDays = false,
+    String? effortUnit,
+    bool clearEffortUnit = false,
   }) {
     return TaskItem(
       id: id ?? this.id,
@@ -102,6 +107,7 @@ class TaskItem {
       actualWorkingDays: clearActualWorkingDays
           ? null
           : (actualWorkingDays ?? this.actualWorkingDays),
+      effortUnit: clearEffortUnit ? null : (effortUnit ?? this.effortUnit),
     );
   }
 
@@ -123,6 +129,7 @@ class TaskItem {
         if (estimateWorkingDays != null)
           'estimateWorkingDays': estimateWorkingDays,
         if (actualWorkingDays != null) 'actualWorkingDays': actualWorkingDays,
+        if (effortUnit != null) 'effortUnit': effortUnit,
       };
 
   factory TaskItem.fromJson(Map<String, dynamic> json) {
@@ -159,6 +166,7 @@ class TaskItem {
         json['actualWorkingDays'],
         json['actualMinutes'],
       ),
+      effortUnit: json['effortUnit'] as String?,
     );
   }
 }

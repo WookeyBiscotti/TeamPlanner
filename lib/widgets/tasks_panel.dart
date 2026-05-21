@@ -30,6 +30,7 @@ class TasksPanel extends StatefulWidget {
 
 class _TasksPanelState extends State<TasksPanel> {
   TaskListFilters _filters = TaskListFilters.empty;
+  final _detailPaneKey = GlobalKey<TaskDetailPaneState>();
 
   void _ensureSelection(List<TaskItem> tasks) {
     String? next;
@@ -60,6 +61,8 @@ class _TasksPanelState extends State<TasksPanel> {
           (t) => isAutoSchedulable(t, tasks) && t.isOnTimeline,
         )
         .length;
+    await _detailPaneKey.currentState?.savePending();
+
     if (toReplan > 0) {
       final confirmed = await showDialog<bool>(
         context: context,
@@ -68,7 +71,8 @@ class _TasksPanelState extends State<TasksPanel> {
           content: Text(
             'Перепланировать $toReplan задач на таймлайне? '
             'Будут учтены оценки, исполнители и блокеры. '
-            'У всех незавершённых блокеров должна быть оценка.',
+            'Учитывается только «Трудозатраты → Оценка» (нужно сохранить задачу). '
+            'У блокеров тоже должна быть оценка.',
           ),
           actions: [
             TextButton(
@@ -261,7 +265,7 @@ class _TasksPanelState extends State<TasksPanel> {
                                 ),
                               )
                             : TaskDetailPane(
-                                key: ValueKey(selected.id),
+                                key: _detailPaneKey,
                                 taskId: selected.id,
                                 onSelectTask: _select,
                                 onDeleted: () {

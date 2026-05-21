@@ -24,6 +24,8 @@ class TaskTimeFormValues {
     required this.duration,
     required this.workingDays,
     required this.clearWorkingDays,
+    required this.effortUnit,
+    required this.clearEffortUnit,
   });
 
   final int? estimateWorkingDays;
@@ -37,6 +39,8 @@ class TaskTimeFormValues {
   final Duration? duration;
   final int? workingDays;
   final bool clearWorkingDays;
+  final String? effortUnit;
+  final bool clearEffortUnit;
 }
 
 /// Timeline placement and effort — saved together with the rest of the task.
@@ -87,18 +91,18 @@ class TaskTimeSectionState extends State<TaskTimeSection> {
   }
 
   void _syncFromTask(TaskItem task) {
-    _unit = durationUnitForTask(task);
+    _unit = task.effortUnit == 'hours'
+        ? DurationUnit.hours
+        : task.effortUnit == 'days'
+            ? DurationUnit.days
+            : durationUnitForTask(task);
     if (_unit == DurationUnit.days) {
-      _estimateController.text = workingDaysToField(
-        task.estimateWorkingDays ??
-            (task.usesWorkingDays ? task.workingDays : null),
-      );
+      _estimateController.text = workingDaysToField(task.estimateWorkingDays);
       _actualController.text = workingDaysToField(task.actualWorkingDays);
     } else {
-      final fallbackHours = task.duration.inHours > 0 ? task.duration.inHours : 4;
       _estimateController.text = task.estimateWorkingDays != null
           ? '${task.estimateWorkingDays}'
-          : '$fallbackHours';
+          : '';
       _actualController.text = task.actualWorkingDays != null
           ? '${task.actualWorkingDays}'
           : '';
@@ -224,6 +228,10 @@ class TaskTimeSectionState extends State<TaskTimeSection> {
       duration: duration,
       workingDays: workingDays,
       clearWorkingDays: clearWorkingDays,
+      effortUnit: estimateWorkingDays != null
+          ? (_unit == DurationUnit.hours ? 'hours' : 'days')
+          : null,
+      clearEffortUnit: estimateWorkingDays == null && estimateText.isEmpty,
     );
   }
 

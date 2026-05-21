@@ -74,10 +74,12 @@ class TaskDetailPane extends StatefulWidget {
   final VoidCallback onDeleted;
 
   @override
-  State<TaskDetailPane> createState() => _TaskDetailPaneState();
+  TaskDetailPaneState createState() => TaskDetailPaneState();
 }
 
-class _TaskDetailPaneState extends State<TaskDetailPane> {
+/// Public state for saving the open task before auto-schedule.
+class TaskDetailPaneState extends State<TaskDetailPane> {
+
   late final TextEditingController _titleController;
   late final TextEditingController _descriptionController;
   late final TextEditingController _externalUrlController;
@@ -135,6 +137,9 @@ class _TaskDetailPaneState extends State<TaskDetailPane> {
     }
   }
 
+  /// Persists the form (including Трудозатраты → Оценка).
+  Future<void> savePending() => _saveTask(widget.taskId);
+
   Future<void> _saveTask(String taskId) async {
     final title = _titleController.text.trim();
     if (title.isEmpty) return;
@@ -158,6 +163,8 @@ class _TaskDetailPaneState extends State<TaskDetailPane> {
           duration: time.duration,
           workingDays: time.workingDays,
           clearWorkingDays: time.clearWorkingDays,
+          effortUnit: time.effortUnit,
+          clearEffortUnit: time.clearEffortUnit,
         );
     if (_descriptionController.text.trim().isEmpty && mounted) {
       setState(() => _descriptionExpanded = false);

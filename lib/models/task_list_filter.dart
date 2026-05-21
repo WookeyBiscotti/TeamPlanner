@@ -1,5 +1,5 @@
-import '../utils/task_schedule_fields.dart';
 import 'task_item.dart';
+import '../utils/task_schedule_fields.dart';
 
 enum TaskEstimateFilter { estimated, notEstimated }
 
@@ -50,9 +50,6 @@ class TaskListFilters {
   }
 }
 
-/// Planned effort for filters and auto-schedule (оценка, факт или длительность на таймлайне).
-bool taskHasEstimate(TaskItem task) => taskHasLaborData(task);
-
 List<TaskItem> filterTasksForList(
   List<TaskItem> tasks,
   TaskListFilters filters,
@@ -61,7 +58,7 @@ List<TaskItem> filterTasksForList(
 
   return tasks.where((task) {
     if (filters.estimate.isNotEmpty) {
-      final estimated = taskHasLaborData(task);
+      final estimated = taskHasPlannedEstimate(task);
       final matches = (estimated &&
               filters.estimate.contains(TaskEstimateFilter.estimated)) ||
           (!estimated &&

@@ -1,6 +1,5 @@
 import '../models/planner_state.dart';
 import '../models/task_item.dart';
-import '../models/task_list_filter.dart';
 import 'task_colors.dart';
 import 'task_relations.dart';
 import 'task_schedule_fields.dart';
@@ -71,7 +70,8 @@ AutoScheduleResult computeAutoSchedule(PlannerState state) {
     if (index < 0) continue;
     final task = list[index];
 
-    final effort = _scheduleEffort(task, _autoScheduleUnit(task));
+    final unit = plannedEstimateUnit(task);
+    final effort = _scheduleEffort(task, unit);
 
     final employeeId = _resolveEmployeeId(
       task: task,
@@ -152,8 +152,11 @@ String? _missingBlockerEstimateError(Set<String> estimatedIds, List<TaskItem> ta
     for (final blockerId in task.blockedByIds) {
       final blocker = taskById(tasks, blockerId);
       if (blocker == null || isEffectivelyCompleted(blocker, tasks)) continue;
-      if (!taskHasEstimate(blocker)) {
-        lines.add('«${task.title}» — блокер «${blocker.title}» без оценки');
+      if (!taskHasPlannedEstimate(blocker)) {
+        lines.add(
+          '«${task.title}» — у блокера «${blocker.title}» не заполнена '
+          'Трудозатраты → Оценка',
+        );
       }
     }
   }
@@ -243,18 +246,8 @@ class _ScheduleEffort {
   final bool clearWorkingDays;
 }
 
-DurationUnit _autoScheduleUnit(TaskItem task) {
-  if (task.usesWorkingDays) return DurationUnit.days;
-  final est = task.estimateWorkingDays ?? task.actualWorkingDays;
-  if (est == null || est <= 0) return durationUnitForTask(task);
-  if (task.duration.inHours == est && task.duration.inHours < 24) {
-    return DurationUnit.hours;
-  }
-  return DurationUnit.days;
-}
-
 _ScheduleEffort _scheduleEffort(TaskItem task, DurationUnit unit) {
-  final amount = effortAmountForTask(task, unit).clamp(1, 999);
+  final amount = plannedEstimateAmount(task).clamp(1, 999);
   if (unit == DurationUnit.hours) {
     return _ScheduleEffort(
       duration: Duration(hours: amount),
@@ -271,8 +264,8 @@ String _noSchedulableTasksMessage(List<TaskItem> tasks) {
   final withEstimate =
       tasks.where((t) => taskHasEstimate(t)).toList(growable: false);
   if (withEstimate.isEmpty) {
-    return 'Нет задач с оценкой — укажите оценку, факт или длительность '
-        '(раб. дн.) в карточке задачи';
+    return 'Нет задач с оценкой — заполните поле «Трудозатраты → Оценка» '
+        'и нажмите «Сохранить» в карточке задачи';
   }
 
   final open = withEstimate

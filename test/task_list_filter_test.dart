@@ -42,32 +42,30 @@ void main() {
     expect(filterTasksForList(all, TaskListFilters.empty), all);
   });
 
-  test('estimate filter', () {
+  test('estimate filter uses planned estimate only', () {
     final filters = TaskListFilters(
       estimate: {TaskEstimateFilter.estimated},
     );
     expect(
       filterTasksForList(all, filters).map((t) => t.id),
-      ['1', '3', '4', '5'],
+      ['1', '3'],
     );
   });
 
-  test('timeline workingDays without estimate counts as estimated', () {
+  test('timeline workingDays without estimate is not in estimate filter', () {
+    expect(taskHasPlannedEstimate(timelineDaysOnly), isFalse);
     expect(taskHasLaborData(timelineDaysOnly), isTrue);
     final filters = TaskListFilters(
       estimate: {TaskEstimateFilter.estimated},
     );
-    expect(
-      filterTasksForList([timelineDaysOnly], filters).map((t) => t.id),
-      ['5'],
-    );
+    expect(filterTasksForList([timelineDaysOnly], filters), isEmpty);
   });
 
-  test('not estimated filter excludes estimate and actual', () {
+  test('not estimated filter excludes planned estimate', () {
     final filters = TaskListFilters(
       estimate: {TaskEstimateFilter.notEstimated},
     );
-    expect(filterTasksForList(all, filters).map((t) => t.id), ['2']);
+    expect(filterTasksForList(all, filters).map((t) => t.id), ['2', '4', '5']);
   });
 
   test('schedule filter', () {
@@ -89,6 +87,6 @@ void main() {
       estimate: {TaskEstimateFilter.estimated},
       schedule: {TaskScheduleFilter.scheduled},
     );
-    expect(filterTasksForList(all, filters).map((t) => t.id), ['3', '5']);
+    expect(filterTasksForList(all, filters).map((t) => t.id), ['3']);
   });
 }

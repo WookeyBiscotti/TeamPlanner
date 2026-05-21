@@ -224,7 +224,7 @@ void main() {
     expect(result.scheduledCount, 0);
   });
 
-  test('schedules task with timeline workingDays only', () {
+  test('uses estimate field not timeline workingDays', () {
     final state = baseState([
       TaskItem(
         id: 't1',
@@ -237,12 +237,27 @@ void main() {
     ]);
 
     final result = computeAutoSchedule(state);
+    expect(result.error, contains('Трудозатраты'));
+    expect(result.scheduledCount, 0);
+  });
+
+  test('schedules hours estimate with effortUnit', () {
+    final state = baseState([
+      const TaskItem(
+        id: 't1',
+        title: 'Hours',
+        employeeId: 'e1',
+        estimateWorkingDays: 6,
+        effortUnit: 'hours',
+        duration: Duration(hours: 6),
+      ),
+    ]);
+
+    final result = computeAutoSchedule(state);
     expect(result.ok, isTrue);
-    expect(result.scheduledCount, 1);
-    expect(
-      result.tasks.firstWhere((t) => t.id == 't1').workingDays,
-      3,
-    );
+    final t = result.tasks.first;
+    expect(t.workingDays, isNull);
+    expect(t.duration, const Duration(hours: 6));
   });
 
   test('plans when blocker has estimate', () {
