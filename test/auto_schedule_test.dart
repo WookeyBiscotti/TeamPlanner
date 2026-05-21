@@ -113,7 +113,56 @@ void main() {
     expect(result.error, isNotNull);
   });
 
-  test('skips parent until all children are closed', () {
+  test('schedules parent when children have no estimate', () {
+    final state = baseState([
+      const TaskItem(
+        id: 'parent',
+        title: 'Epic',
+        employeeId: 'e1',
+        estimateWorkingDays: 3,
+      ),
+      const TaskItem(id: 'child', title: 'Child', parentId: 'parent'),
+    ]);
+
+    final result = computeAutoSchedule(state);
+    expect(result.ok, isTrue);
+    expect(result.scheduledCount, 1);
+    expect(
+      result.tasks.firstWhere((t) => t.id == 'parent').isOnTimeline,
+      isTrue,
+    );
+  });
+
+  test('schedules children not parent when children have estimates', () {
+    final state = baseState([
+      const TaskItem(
+        id: 'parent',
+        title: 'Epic',
+        employeeId: 'e1',
+        estimateWorkingDays: 5,
+      ),
+      const TaskItem(
+        id: 'child',
+        title: 'Child',
+        parentId: 'parent',
+        employeeId: 'e1',
+        estimateWorkingDays: 2,
+      ),
+    ]);
+
+    final result = computeAutoSchedule(state);
+    expect(result.scheduledCount, 1);
+    expect(
+      result.tasks.firstWhere((t) => t.id == 'parent').isOnTimeline,
+      isFalse,
+    );
+    expect(
+      result.tasks.firstWhere((t) => t.id == 'child').isOnTimeline,
+      isTrue,
+    );
+  });
+
+  test('skips when all estimated work is effectively done', () {
     final state = baseState([
       const TaskItem(
         id: 'parent',
@@ -122,15 +171,17 @@ void main() {
         estimateWorkingDays: 3,
         status: TaskStatus.closed,
       ),
-      const TaskItem(id: 'child', title: 'Child', parentId: 'parent'),
+      const TaskItem(
+        id: 'child',
+        title: 'Child',
+        parentId: 'parent',
+        status: TaskStatus.closed,
+      ),
     ]);
 
     final result = computeAutoSchedule(state);
     expect(result.scheduledCount, 0);
-    expect(
-      result.tasks.firstWhere((t) => t.id == 'parent').isOnTimeline,
-      isFalse,
-    );
+    expect(result.error, isNotNull);
   });
 
   test('skips completed estimated tasks', () {

@@ -57,10 +57,7 @@ class _TasksPanelState extends State<TasksPanel> {
     final tasks = notifier.allTasks;
     final toReplan = tasks
         .where(
-          (t) =>
-              taskHasEstimate(t) &&
-              !isEffectivelyCompleted(t, tasks) &&
-              t.isOnTimeline,
+          (t) => isAutoSchedulable(t, tasks) && t.isOnTimeline,
         )
         .length;
     if (toReplan > 0) {

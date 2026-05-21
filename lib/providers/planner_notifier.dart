@@ -582,7 +582,7 @@ class PlannerNotifier extends ChangeNotifier {
     final result = computeAutoSchedule(_state);
     if (result.error != null) return result.error!;
     if (result.scheduledCount == 0) {
-      return 'Нет незавершённых задач с оценкой';
+      return 'Не удалось запланировать задачи';
     }
     _state = _state.copyWith(tasks: result.tasks);
     await _persist();

@@ -3,6 +3,7 @@ import '../models/task_item.dart';
 import '../models/task_list_filter.dart';
 import 'task_colors.dart';
 import 'task_relations.dart';
+import 'task_schedule_fields.dart';
 import 'timeline_layout.dart';
 import 'working_days.dart';
 
@@ -33,18 +34,14 @@ AutoScheduleResult computeAutoSchedule(PlannerState state) {
   }
 
   final estimatedIds = state.tasks
-      .where(
-        (t) =>
-            taskHasEstimate(t) &&
-            !isEffectivelyCompleted(t, state.tasks) &&
-            !hasTaskChildren(t.id, state.tasks),
-      )
+      .where((t) => isAutoSchedulable(t, state.tasks))
       .map((t) => t.id)
       .toSet();
 
   if (estimatedIds.isEmpty) {
     return AutoScheduleResult(
       tasks: state.tasks,
+      error: _noSchedulableTasksMessage(state.tasks),
       skippedCount: state.tasks.length,
     );
   }
@@ -74,7 +71,7 @@ AutoScheduleResult computeAutoSchedule(PlannerState state) {
     if (index < 0) continue;
     final task = list[index];
 
-    final workingDays = task.estimateWorkingDays!;
+    final effort = _scheduleEffort(task, _autoScheduleUnit(task));
 
     final employeeId = _resolveEmployeeId(
       task: task,
@@ -95,29 +92,36 @@ AutoScheduleResult computeAutoSchedule(PlannerState state) {
     var draft = task.copyWith(
       employeeId: employeeId,
       start: proposed,
-      workingDays: workingDays,
+      workingDays: effort.workingDays,
+      clearWorkingDays: effort.clearWorkingDays,
+      duration: effort.duration,
       color: colorForEmployee(employeeId),
     );
-    draft = draft.copyWith(
-      duration: calendarDurationForTask(
-        start: proposed,
+    if (effort.workingDays != null) {
+      draft = draft.copyWith(
+        duration: calendarDurationForTask(
+          start: proposed,
+          duration: draft.duration,
+          workingDays: effort.workingDays,
+          holidayRanges: state.holidayRanges,
+          employeeId: employeeId,
+          state: state,
+        ),
+      );
+    }
+
+    final clampedStart = clampTaskStart(state, draft, proposed, list);
+    Duration duration = draft.duration;
+    if (effort.workingDays != null) {
+      duration = calendarDurationForTask(
+        start: clampedStart,
         duration: draft.duration,
-        workingDays: workingDays,
+        workingDays: effort.workingDays,
         holidayRanges: state.holidayRanges,
         employeeId: employeeId,
         state: state,
-      ),
-    );
-
-    final clampedStart = clampTaskStart(state, draft, proposed, list);
-    final duration = calendarDurationForTask(
-      start: clampedStart,
-      duration: draft.duration,
-      workingDays: workingDays,
-      holidayRanges: state.holidayRanges,
-      employeeId: employeeId,
-      state: state,
-    );
+      );
+    }
 
     final scheduled = draft.copyWith(start: clampedStart, duration: duration);
     list[index] = scheduled;
@@ -225,6 +229,76 @@ DateTime _alignToWorkCalendar(
   final dayStart = dateOnly(m).add(const Duration(hours: 9));
   if (m.isBefore(dayStart)) return dayStart;
   return m;
+}
+
+class _ScheduleEffort {
+  const _ScheduleEffort({
+    required this.duration,
+    this.workingDays,
+    this.clearWorkingDays = false,
+  });
+
+  final Duration duration;
+  final int? workingDays;
+  final bool clearWorkingDays;
+}
+
+/// Days vs hours for [estimateWorkingDays] (backlog tasks often keep default 4h duration).
+DurationUnit _autoScheduleUnit(TaskItem task) {
+  if (task.usesWorkingDays) return DurationUnit.days;
+  final est = task.estimateWorkingDays;
+  if (est == null || est <= 0) return durationUnitForTask(task);
+  if (task.duration.inHours == est && task.duration.inHours < 24) {
+    return DurationUnit.hours;
+  }
+  return DurationUnit.days;
+}
+
+_ScheduleEffort _scheduleEffort(TaskItem task, DurationUnit unit) {
+  final raw = task.estimateWorkingDays!;
+  if (unit == DurationUnit.hours) {
+    final hours = raw.clamp(1, 999);
+    return _ScheduleEffort(
+      duration: Duration(hours: hours),
+      clearWorkingDays: true,
+    );
+  }
+  final days = raw.clamp(1, 999);
+  return _ScheduleEffort(
+    duration: Duration(hours: 8 * days),
+    workingDays: days,
+  );
+}
+
+String _noSchedulableTasksMessage(List<TaskItem> tasks) {
+  final withEstimate =
+      tasks.where((t) => taskHasEstimate(t)).toList(growable: false);
+  if (withEstimate.isEmpty) {
+    return 'Нет задач с оценкой — укажите оценку в карточке задачи';
+  }
+
+  final open = withEstimate
+      .where((t) => !isEffectivelyCompleted(t, tasks))
+      .toList(growable: false);
+  if (open.isEmpty) {
+    return 'Все оценённые задачи уже завершены';
+  }
+
+  if (open.every((t) => !isAutoSchedulable(t, tasks))) {
+    final parentsHeldByChildren = open.where((t) {
+      final children = childrenOf(t.id, tasks);
+      return children.isNotEmpty &&
+          children.any(
+            (c) => taskHasEstimate(c) && !isEffectivelyCompleted(c, tasks),
+          );
+    }).toList();
+    if (parentsHeldByChildren.length == open.length) {
+      return 'Планируются подзадачи, а не родитель: у родительских задач '
+          'оценка не ставится на таймлайн, пока есть незавершённые подзадачи с оценкой';
+    }
+  }
+
+  return 'Нет незавершённых задач с оценкой для планирования';
 }
 
 String _resolveEmployeeId({

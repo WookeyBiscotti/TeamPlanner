@@ -1,5 +1,6 @@
 import '../models/planner_state.dart';
 import '../models/task_item.dart';
+import '../models/task_list_filter.dart';
 import '../models/task_status.dart';
 import 'timeline_layout.dart';
 import 'working_days.dart';
@@ -99,6 +100,19 @@ List<TaskItem> childrenOf(String parentId, List<TaskItem> tasks) {
 
 bool hasTaskChildren(String taskId, List<TaskItem> tasks) {
   return tasks.any((t) => t.parentId == taskId);
+}
+
+/// Whether [task] can be placed by auto-schedule (estimate, not done, not superseded by children).
+bool isAutoSchedulable(TaskItem task, List<TaskItem> tasks) {
+  if (!taskHasEstimate(task) || isEffectivelyCompleted(task, tasks)) {
+    return false;
+  }
+  final children = childrenOf(task.id, tasks);
+  if (children.isEmpty) return true;
+  // Parent carries the estimate; children without their own are rolled up here.
+  return !children.any(
+    (c) => taskHasEstimate(c) && !isEffectivelyCompleted(c, tasks),
+  );
 }
 
 /// Leaf tasks use [TaskItem.isCompleted]. Parents are done when every child is done.
