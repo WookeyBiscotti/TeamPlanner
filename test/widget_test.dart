@@ -13,4 +13,16 @@ void main() {
     expect(restored.timelineScale, state.timelineScale);
     expect(restored.pixelsPerDay, state.pixelsPerDay);
   });
+
+  test('importEmployeeMapping round-trips json', () {
+    final state = PlannerState.initial().copyWith(
+      importEmployeeMapping: {
+        'Иван': 'demo-emp-1',
+        'Неизвестный': null,
+      },
+    );
+    final restored = PlannerState.fromJson(state.toJson());
+    expect(restored.importEmployeeMapping['Иван'], 'demo-emp-1');
+    expect(restored.importEmployeeMapping['Неизвестный'], isNull);
+  });
 }

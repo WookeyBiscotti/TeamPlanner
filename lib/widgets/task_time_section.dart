@@ -59,7 +59,6 @@ class TaskTimeSection extends StatefulWidget {
 class TaskTimeSectionState extends State<TaskTimeSection> {
   late final TextEditingController _estimateController;
   late final TextEditingController _actualController;
-  late final TextEditingController _durationController;
   DateTime? _start;
   late DurationUnit _unit;
   String? _employeeId;
@@ -69,7 +68,6 @@ class TaskTimeSectionState extends State<TaskTimeSection> {
     super.initState();
     _estimateController = TextEditingController();
     _actualController = TextEditingController();
-    _durationController = TextEditingController();
     _syncFromTask(widget.task);
   }
 
@@ -89,11 +87,23 @@ class TaskTimeSectionState extends State<TaskTimeSection> {
   }
 
   void _syncFromTask(TaskItem task) {
-    _estimateController.text = workingDaysToField(task.estimateWorkingDays);
-    _actualController.text = workingDaysToField(task.actualWorkingDays);
-    _start = task.start;
     _unit = durationUnitForTask(task);
-    _durationController.text = '${durationAmountForTask(task, _unit)}';
+    if (_unit == DurationUnit.days) {
+      _estimateController.text = workingDaysToField(
+        task.estimateWorkingDays ??
+            (task.usesWorkingDays ? task.workingDays : null),
+      );
+      _actualController.text = workingDaysToField(task.actualWorkingDays);
+    } else {
+      final fallbackHours = task.duration.inHours > 0 ? task.duration.inHours : 4;
+      _estimateController.text = task.estimateWorkingDays != null
+          ? '${task.estimateWorkingDays}'
+          : '$fallbackHours';
+      _actualController.text = task.actualWorkingDays != null
+          ? '${task.actualWorkingDays}'
+          : '';
+    }
+    _start = task.start;
     _employeeId = task.employeeId;
   }
 
@@ -126,33 +136,30 @@ class TaskTimeSectionState extends State<TaskTimeSection> {
   void dispose() {
     _estimateController.dispose();
     _actualController.dispose();
-    _durationController.dispose();
     super.dispose();
   }
 
-  ({Duration? duration, int? workingDays, bool clearWorkingDays})
-      _durationFieldsFromForm() {
-    final amount = int.tryParse(_durationController.text) ?? 1;
+  int _effortAmount() {
     if (_unit == DurationUnit.days) {
-      return (
-        duration: Duration(hours: 8 * amount),
-        workingDays: amount,
-        clearWorkingDays: false,
-      );
+      final actual = parseWorkingDaysField(_actualController.text);
+      final estimate = parseWorkingDaysField(_estimateController.text);
+      return actual ?? estimate ?? 1;
     }
-    return (
-      duration: Duration(hours: amount),
-      workingDays: null,
-      clearWorkingDays: true,
-    );
+    final actual = int.tryParse(_actualController.text.trim());
+    final estimate = int.tryParse(_estimateController.text.trim());
+    return actual ?? estimate ?? 4;
   }
 
   TaskTimeFormValues collectValues() {
     final estimateText = _estimateController.text.trim();
     final actualText = _actualController.text.trim();
-    final estimateWorkingDays = parseWorkingDaysField(estimateText);
-    final actualWorkingDays = parseWorkingDaysField(actualText);
-    final amount = int.tryParse(_durationController.text) ?? 1;
+    final estimateWorkingDays = _unit == DurationUnit.days
+        ? parseWorkingDaysField(estimateText)
+        : null;
+    final actualWorkingDays = _unit == DurationUnit.days
+        ? parseWorkingDaysField(actualText)
+        : null;
+    final amount = _effortAmount();
     final onTimeline = _start != null;
 
     Duration? duration;
@@ -186,10 +193,13 @@ class TaskTimeSectionState extends State<TaskTimeSection> {
       workingDays = schedule.workingDays;
       clearWorkingDays = schedule.clearWorkingDays;
     } else if (_employeeId != null) {
-      final fields = _durationFieldsFromForm();
-      duration = fields.duration;
-      workingDays = fields.workingDays;
-      clearWorkingDays = fields.clearWorkingDays;
+      if (_unit == DurationUnit.days) {
+        duration = Duration(hours: 8 * amount);
+        workingDays = amount;
+      } else {
+        duration = Duration(hours: amount);
+        clearWorkingDays = true;
+      }
     }
 
     return TaskTimeFormValues(
@@ -246,20 +256,39 @@ class TaskTimeSectionState extends State<TaskTimeSection> {
 
   DateTime? _timelineEndPreview() {
     if (_employeeId == null || _start == null) return null;
-    final amount = int.tryParse(_durationController.text) ?? 1;
     final schedule = buildScheduleFields(
       task: widget.task,
       onTimeline: true,
       employeeId: _employeeId,
       start: _start!,
       unit: _unit,
-      amount: amount,
+      amount: _effortAmount(),
       state: context.read<PlannerNotifier>().state,
     );
     final start = schedule.start;
     final duration = schedule.duration;
     if (start == null || duration == null) return null;
     return start.add(duration);
+  }
+
+  String? _timelineEffortHint() {
+    final actual = _unit == DurationUnit.days
+        ? parseWorkingDaysField(_actualController.text)
+        : int.tryParse(_actualController.text.trim());
+    final estimate = _unit == DurationUnit.days
+        ? parseWorkingDaysField(_estimateController.text)
+        : int.tryParse(_estimateController.text.trim());
+    if (actual != null) {
+      return _unit == DurationUnit.days
+          ? 'На таймлайне: $actual раб. дн. (факт)'
+          : 'На таймлайне: $actual ч (факт)';
+    }
+    if (estimate != null) {
+      return _unit == DurationUnit.days
+          ? 'На таймлайне: $estimate раб. дн. (оценка)'
+          : 'На таймлайне: $estimate ч (оценка)';
+    }
+    return null;
   }
 
   @override
@@ -270,8 +299,13 @@ class TaskTimeSectionState extends State<TaskTimeSection> {
     final onTimeline = _start != null;
     final endPreview = _timelineEndPreview();
 
-    final estimatePreview = parseWorkingDaysField(_estimateController.text);
-    final actualPreview = parseWorkingDaysField(_actualController.text);
+    final estimatePreview = _unit == DurationUnit.days
+        ? parseWorkingDaysField(_estimateController.text)
+        : null;
+    final actualPreview = _unit == DurationUnit.days
+        ? parseWorkingDaysField(_actualController.text)
+        : null;
+    final timelineEffortHint = assigned && onTimeline ? _timelineEffortHint() : null;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -333,6 +367,16 @@ class TaskTimeSectionState extends State<TaskTimeSection> {
                             : 'Начало ${formatDateTime(_start!)}',
                         style: theme.textTheme.bodyMedium,
                       ),
+                      if (timelineEffortHint != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Text(
+                            timelineEffortHint,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ),
                       if (blockerMin != null)
                         Padding(
                           padding: const EdgeInsets.only(top: 2),
@@ -381,53 +425,6 @@ class TaskTimeSectionState extends State<TaskTimeSection> {
               label: const Text('Запланировать на таймлайне'),
             ),
           ],
-          const SizedBox(height: 8),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _durationController,
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [
-                    FilteringTextInputFormatter.digitsOnly,
-                  ],
-                  onChanged: (_) => setState(() {}),
-                  decoration: TaskFieldStyle.withPrefix(
-                    icon: TaskFieldStyle.duration,
-                    color: TaskFieldStyle.durationColor(theme.colorScheme),
-                    decoration: InputDecoration(
-                      labelText: 'Длительность',
-                      helperText: _unit == DurationUnit.days
-                          ? 'Рабочие дни (без выходных)'
-                          : null,
-                      border: const OutlineInputBorder(),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: DropdownButton<DurationUnit>(
-                  value: _unit,
-                  items: const [
-                    DropdownMenuItem(
-                      value: DurationUnit.hours,
-                      child: Text('часов'),
-                    ),
-                    DropdownMenuItem(
-                      value: DurationUnit.days,
-                      child: Text('раб. дней'),
-                    ),
-                  ],
-                  onChanged: (v) {
-                    if (v != null) setState(() => _unit = v);
-                  },
-                ),
-              ),
-            ],
-          ),
         ],
         const SizedBox(height: 16),
         TaskFieldStyle.sectionHeader(
@@ -441,25 +438,60 @@ class TaskTimeSectionState extends State<TaskTimeSection> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(
-              child: _WorkingDaysField(
+              child: _EffortField(
                 controller: _estimateController,
                 label: 'Оценка',
                 icon: TaskFieldStyle.estimate,
                 iconColor: TaskFieldStyle.estimateColor(theme.colorScheme),
-                helperText: 'Плановые трудозатраты (раб. дни)',
+                unit: _unit,
+                helperText: _unit == DurationUnit.days
+                    ? 'Плановые трудозатраты'
+                    : 'Плановые трудозатраты (часы)',
                 onChanged: () => setState(() {}),
               ),
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: _WorkingDaysField(
+              child: _EffortField(
                 controller: _actualController,
                 label: 'Фактическое время',
                 icon: TaskFieldStyle.actual,
                 iconColor: TaskFieldStyle.actualColor(theme.colorScheme),
-                helperText: 'Сколько потрачено по факту (раб. дни)',
+                unit: _unit,
+                helperText: _unit == DurationUnit.days
+                    ? 'По факту; приоритет на таймлайне'
+                    : 'По факту (часы); приоритет на таймлайне',
                 onChanged: () => setState(() {}),
               ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Text(
+              'Единица:',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(width: 8),
+            DropdownButton<DurationUnit>(
+              value: _unit,
+              isDense: true,
+              items: const [
+                DropdownMenuItem(
+                  value: DurationUnit.days,
+                  child: Text('рабочие дни'),
+                ),
+                DropdownMenuItem(
+                  value: DurationUnit.hours,
+                  child: Text('часы'),
+                ),
+              ],
+              onChanged: (v) {
+                if (v != null) setState(() => _unit = v);
+              },
             ),
           ],
         ),
@@ -475,12 +507,13 @@ class TaskTimeSectionState extends State<TaskTimeSection> {
   }
 }
 
-class _WorkingDaysField extends StatelessWidget {
-  const _WorkingDaysField({
+class _EffortField extends StatelessWidget {
+  const _EffortField({
     required this.controller,
     required this.label,
     required this.icon,
     required this.iconColor,
+    required this.unit,
     this.helperText,
     this.onChanged,
   });
@@ -489,11 +522,13 @@ class _WorkingDaysField extends StatelessWidget {
   final String label;
   final IconData icon;
   final Color iconColor;
+  final DurationUnit unit;
   final String? helperText;
   final VoidCallback? onChanged;
 
   @override
   Widget build(BuildContext context) {
+    final suffix = unit == DurationUnit.days ? 'раб. дн.' : 'ч';
     return TextField(
       controller: controller,
       keyboardType: TextInputType.number,
@@ -506,7 +541,7 @@ class _WorkingDaysField extends StatelessWidget {
           labelText: label,
           helperText: helperText,
           border: const OutlineInputBorder(),
-          suffixText: 'раб. дн.',
+          suffixText: suffix,
         ),
       ),
     );

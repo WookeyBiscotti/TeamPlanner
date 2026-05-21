@@ -9,13 +9,21 @@ void main() {
   test('parses JSON array of tasks', () {
     final result = parseImportJson([
       {'id': 'a', 'title': 'Задача A'},
-      {'title': 'Задача B', 'description': 'описание'},
+      {
+        'title': 'Задача B',
+        'description': 'описание',
+        'externalDescriptionUrl': 'https://tracker/issue/2',
+      },
     ]);
 
     expect(result.kind, ImportKind.mergeTasks);
     expect(result.parsedTasks, hasLength(2));
     expect(result.parsedTasks![0].task.title, 'Задача A');
     expect(result.parsedTasks![1].task.title, 'Задача B');
+    expect(
+      result.parsedTasks![1].task.externalDescriptionUrl,
+      'https://tracker/issue/2',
+    );
   });
 
   test('parses employeeName from task', () {
@@ -79,6 +87,30 @@ void main() {
       ),
     ];
     expect(collectImportEmployeeNames(imports, {'emp-1'}), ['Внешний']);
+  });
+
+  test('resolveEmployeeMappingForImport prefers saved mapping', () {
+    const employees = [
+      Employee(id: 'e1', name: 'Алексей'),
+      Employee(id: 'e2', name: 'Мария'),
+    ];
+    final mapping = resolveEmployeeMappingForImport(
+      importNames: ['Внешний', 'Мария'],
+      savedMapping: {'Внешний': 'e1'},
+      projectEmployees: employees,
+    );
+    expect(mapping['Внешний'], 'e1');
+    expect(mapping['Мария'], 'e2');
+  });
+
+  test('resolveEmployeeMappingForImport keeps explicit null assign', () {
+    const employees = [Employee(id: 'e1', name: 'Алексей')];
+    final mapping = resolveEmployeeMappingForImport(
+      importNames: ['Игнор'],
+      savedMapping: {'Игнор': null},
+      projectEmployees: employees,
+    );
+    expect(mapping['Игнор'], isNull);
   });
 
   test('suggestEmployeeMapping matches by name', () {

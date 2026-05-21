@@ -7,6 +7,7 @@ class TaskItem {
     required this.id,
     required this.title,
     this.description = '',
+    this.externalDescriptionUrl = '',
     this.employeeId,
     this.start,
     this.duration = const Duration(hours: 4),
@@ -23,6 +24,8 @@ class TaskItem {
   final String id;
   final String title;
   final String description;
+  /// Link to task description in an external system (issue tracker, wiki, etc.).
+  final String externalDescriptionUrl;
   final String? employeeId;
   final DateTime? start;
   final Duration duration;
@@ -55,6 +58,7 @@ class TaskItem {
     String? id,
     String? title,
     String? description,
+    String? externalDescriptionUrl,
     String? employeeId,
     bool clearEmployeeId = false,
     DateTime? start,
@@ -79,6 +83,8 @@ class TaskItem {
       id: id ?? this.id,
       title: title ?? this.title,
       description: description ?? this.description,
+      externalDescriptionUrl:
+          externalDescriptionUrl ?? this.externalDescriptionUrl,
       employeeId: clearEmployeeId ? null : (employeeId ?? this.employeeId),
       start: clearStart ? null : (start ?? this.start),
       duration: duration ?? this.duration,
@@ -103,6 +109,8 @@ class TaskItem {
         'id': id,
         'title': title,
         'description': description,
+        if (externalDescriptionUrl.isNotEmpty)
+          'externalDescriptionUrl': externalDescriptionUrl,
         if (employeeId != null) 'employeeId': employeeId,
         if (start != null) 'start': start!.toIso8601String(),
         'durationMinutes': duration.inMinutes,
@@ -127,6 +135,7 @@ class TaskItem {
       id: json['id'] as String,
       title: json['title'] as String,
       description: json['description'] as String? ?? '',
+      externalDescriptionUrl: _externalDescriptionUrlFromJson(json),
       employeeId: employeeId,
       start: startRaw != null ? DateTime.parse(startRaw) : null,
       duration: duration,
@@ -152,6 +161,21 @@ class TaskItem {
       ),
     );
   }
+}
+
+String _externalDescriptionUrlFromJson(Map<String, dynamic> json) {
+  for (final key in [
+    'externalDescriptionUrl',
+    'externalUrl',
+    'descriptionUrl',
+    'externalLink',
+  ]) {
+    final value = json[key];
+    if (value is String && value.trim().isNotEmpty) {
+      return value.trim();
+    }
+  }
+  return '';
 }
 
 int? _workingDaysFromJson(Object? daysRaw, Object? legacyMinutesRaw) {

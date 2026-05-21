@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../models/task_fill_pattern.dart';
 import '../models/task_item.dart';
 import '../providers/planner_notifier.dart';
+import '../services/task_editor_preferences.dart';
 import '../utils/task_appearance.dart';
 import '../utils/task_colors.dart';
 import '../utils/task_field_style.dart';
@@ -31,14 +32,19 @@ class _TaskAppearanceSectionState extends State<TaskAppearanceSection> {
   void initState() {
     super.initState();
     _expanded = _hasCustomAppearance(widget.task);
+    _loadExpandedPreference();
   }
 
-  @override
-  void didUpdateWidget(covariant TaskAppearanceSection oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.task.id != widget.task.id) {
-      _expanded = _hasCustomAppearance(widget.task);
-    }
+  Future<void> _loadExpandedPreference() async {
+    final saved = await TaskEditorPreferences.loadAppearanceExpanded();
+    if (!mounted || saved == null) return;
+    setState(() => _expanded = saved);
+  }
+
+  void _toggleExpanded() {
+    final next = !_expanded;
+    setState(() => _expanded = next);
+    TaskEditorPreferences.saveAppearanceExpanded(next);
   }
 
   @override
@@ -55,7 +61,7 @@ class _TaskAppearanceSectionState extends State<TaskAppearanceSection> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         InkWell(
-          onTap: () => setState(() => _expanded = !_expanded),
+          onTap: _toggleExpanded,
           borderRadius: BorderRadius.circular(8),
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 4),

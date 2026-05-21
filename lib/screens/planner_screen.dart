@@ -11,6 +11,7 @@ import '../widgets/employee_import_mapping_dialog.dart';
 import '../widgets/employee_sidebar.dart';
 import '../widgets/gantt_chart.dart';
 import '../widgets/relations_view.dart';
+import '../widgets/task_detail_pane.dart';
 import '../widgets/tasks_panel.dart';
 
 class PlannerScreen extends StatefulWidget {
@@ -238,8 +239,17 @@ class _PlannerScreenState extends State<PlannerScreen> {
                             verticalScrollController: _verticalScrollController,
                             horizontalScrollController:
                                 _horizontalScrollController,
-                            onTaskSelected: (id) =>
-                                setState(() => _selectedTaskId = id),
+                            onTaskSelected: (id) {
+                              setState(() => _selectedTaskId = id);
+                              showTaskEditorDialog(
+                                context,
+                                taskId: id,
+                                onSelectTask: (otherId) =>
+                                    setState(() => _selectedTaskId = otherId),
+                                onDeleted: () =>
+                                    setState(() => _selectedTaskId = null),
+                              );
+                            },
                           ),
                         ),
                       ],

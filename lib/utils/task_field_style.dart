@@ -6,6 +6,7 @@ import '../models/task_status.dart';
 abstract final class TaskFieldStyle {
   static const title = Icons.title;
   static const description = Icons.notes;
+  static const externalDescription = Icons.link;
   static const status = Icons.flag_outlined;
   static const employee = Icons.person_outline;
   static const schedule = Icons.event;
@@ -20,6 +21,7 @@ abstract final class TaskFieldStyle {
 
   static Color titleColor(ColorScheme s) => s.primary;
   static Color descriptionColor(ColorScheme s) => s.onSurfaceVariant;
+  static Color externalDescriptionColor(ColorScheme s) => s.tertiary;
   static Color employeeColor(ColorScheme s) => s.secondary;
   static Color scheduleColor(ColorScheme s) => s.primary;
   static Color durationColor(ColorScheme s) => const Color(0xFFEF6C00);

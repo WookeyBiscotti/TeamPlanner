@@ -63,7 +63,8 @@ class _EmployeeImportMappingDialogState
             children: [
               Text(
                 'В файле указаны исполнители, которых нужно сопоставить '
-                'с сотрудниками проекта:',
+                'с сотрудниками проекта. Выбранные соответствия сохраняются '
+                'в проекте для следующих импортов.',
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
               const SizedBox(height: 16),

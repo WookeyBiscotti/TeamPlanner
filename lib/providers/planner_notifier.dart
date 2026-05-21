@@ -128,6 +128,7 @@ class PlannerNotifier extends ChangeNotifier {
     String id, {
     String? title,
     String? description,
+    String? externalDescriptionUrl,
     int? estimateWorkingDays,
     bool clearEstimateWorkingDays = false,
     int? actualWorkingDays,
@@ -146,6 +147,8 @@ class PlannerNotifier extends ChangeNotifier {
     var updated = current.copyWith(
       title: title ?? current.title,
       description: description ?? current.description,
+      externalDescriptionUrl:
+          externalDescriptionUrl ?? current.externalDescriptionUrl,
       estimateWorkingDays: estimateWorkingDays,
       clearEstimateWorkingDays: clearEstimateWorkingDays,
       actualWorkingDays: actualWorkingDays,
@@ -526,7 +529,11 @@ class PlannerNotifier extends ChangeNotifier {
   }
 
   Map<String, String?> suggestEmployeeMappingForImport(List<String> importNames) =>
-      suggestEmployeeMapping(importNames, _state.employees);
+      resolveEmployeeMappingForImport(
+        importNames: importNames,
+        savedMapping: _state.importEmployeeMapping,
+        projectEmployees: _state.employees,
+      );
 
   Future<String?> mergeImportedTasks(
     List<ParsedTaskImport> parsed,
@@ -544,7 +551,13 @@ class PlannerNotifier extends ChangeNotifier {
       projectIds,
       () => _uuid.v4(),
     );
-    _state = _state.copyWith(tasks: [..._state.tasks, ...prepared]);
+    final updatedMapping = Map<String, String?>.from(
+      _state.importEmployeeMapping,
+    )..addAll(employeeNameMapping);
+    _state = _state.copyWith(
+      tasks: [..._state.tasks, ...prepared],
+      importEmployeeMapping: updatedMapping,
+    );
     await _persist();
     return 'Добавлено задач: ${prepared.length}';
   }

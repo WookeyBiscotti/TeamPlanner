@@ -105,6 +105,34 @@ void main() {
     expect(restored.actualWorkingDays, 1);
   });
 
+  test('external description url round-trips json', () {
+    const task = TaskItem(
+      id: '1',
+      title: 'T',
+      externalDescriptionUrl: 'https://example.com/issue/1',
+    );
+    final restored = TaskItem.fromJson(task.toJson());
+    expect(restored.externalDescriptionUrl, 'https://example.com/issue/1');
+  });
+
+  test('external description url reads import aliases', () {
+    final fromUrl = TaskItem.fromJson({
+      'id': '1',
+      'title': 'T',
+      'durationMinutes': 240,
+      'externalUrl': 'https://a.example',
+    });
+    expect(fromUrl.externalDescriptionUrl, 'https://a.example');
+
+    final fromLink = TaskItem.fromJson({
+      'id': '2',
+      'title': 'T',
+      'durationMinutes': 240,
+      'externalLink': 'https://b.example',
+    });
+    expect(fromLink.externalDescriptionUrl, 'https://b.example');
+  });
+
   test('backlog task round-trips json', () {
     const task = TaskItem(
       id: '1',

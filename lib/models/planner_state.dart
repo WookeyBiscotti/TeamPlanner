@@ -16,6 +16,7 @@ class PlannerState {
     required this.employees,
     required this.tasks,
     this.holidayRanges = const [],
+    this.importEmployeeMapping = const {},
   });
 
   final DateTime timelineStart;
@@ -26,6 +27,8 @@ class PlannerState {
   final List<TaskItem> tasks;
   /// Company-wide non-working periods (in addition to weekends).
   final List<CalendarRange> holidayRanges;
+  /// Import name -> project [Employee.id]; null = do not assign.
+  final Map<String, String?> importEmployeeMapping;
 
   PlannerState copyWith({
     DateTime? timelineStart,
@@ -35,6 +38,7 @@ class PlannerState {
     List<Employee>? employees,
     List<TaskItem>? tasks,
     List<CalendarRange>? holidayRanges,
+    Map<String, String?>? importEmployeeMapping,
   }) {
     return PlannerState(
       timelineStart: timelineStart ?? this.timelineStart,
@@ -44,6 +48,8 @@ class PlannerState {
       employees: employees ?? this.employees,
       tasks: tasks ?? this.tasks,
       holidayRanges: holidayRanges ?? this.holidayRanges,
+      importEmployeeMapping:
+          importEmployeeMapping ?? this.importEmployeeMapping,
     );
   }
 
@@ -133,6 +139,8 @@ class PlannerState {
         'tasks': tasks.map((t) => t.toJson()).toList(),
         if (holidayRanges.isNotEmpty)
           'holidayRanges': holidayRanges.map((r) => r.toJson()).toList(),
+        if (importEmployeeMapping.isNotEmpty)
+          'importEmployeeMapping': importEmployeeMapping,
       };
 
   factory PlannerState.fromJson(Map<String, dynamic> json) {
@@ -165,6 +173,19 @@ class PlannerState {
           .map((t) => TaskItem.fromJson(t as Map<String, dynamic>))
           .toList(),
       holidayRanges: mergeRanges(holidayRanges),
+      importEmployeeMapping: _parseImportEmployeeMapping(
+        json['importEmployeeMapping'],
+      ),
     );
   }
+}
+
+Map<String, String?> _parseImportEmployeeMapping(dynamic raw) {
+  if (raw is! Map) return const {};
+  return raw.map(
+    (key, value) => MapEntry(
+      key as String,
+      value == null ? null : value as String,
+    ),
+  );
 }

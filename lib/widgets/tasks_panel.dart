@@ -5,16 +5,13 @@ import '../constants.dart';
 import '../models/employee.dart';
 import '../models/task_item.dart';
 import '../models/task_list_filter.dart';
-import '../models/task_status.dart';
 import '../providers/planner_notifier.dart';
 import '../utils/task_appearance.dart';
 import '../utils/task_field_style.dart';
 import '../utils/task_format.dart';
 import '../utils/task_relations.dart';
-import 'task_appearance_section.dart';
-import 'task_relations_section.dart';
+import 'task_detail_pane.dart';
 import 'task_status_chip.dart';
-import 'task_time_section.dart';
 
 /// Task list (left) and task detail (right).
 class TasksPanel extends StatefulWidget {
@@ -266,9 +263,9 @@ class _TasksPanelState extends State<TasksPanel> {
                                   ),
                                 ),
                               )
-                            : _TaskDetailPane(
+                            : TaskDetailPane(
                                 key: ValueKey(selected.id),
-                                task: selected,
+                                taskId: selected.id,
                                 onSelectTask: _select,
                                 onDeleted: () {
                                   final remaining = notifier.allTasks
@@ -447,7 +444,7 @@ class _TaskListTile extends StatelessWidget {
                         const SizedBox(width: 4),
                         TaskStatusChip(status: task.status, compact: true),
                         const SizedBox(width: 4),
-                        _ScheduleChip(scheduled: task.isScheduled, compact: true),
+                        TaskScheduleChip(scheduled: task.isScheduled, compact: true),
                       ],
                     ),
                     const SizedBox(height: 2),
@@ -478,289 +475,6 @@ class _TaskListTile extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _TaskDetailPane extends StatefulWidget {
-  const _TaskDetailPane({
-    super.key,
-    required this.task,
-    required this.onSelectTask,
-    required this.onDeleted,
-  });
-
-  final TaskItem task;
-  final void Function(String taskId) onSelectTask;
-  final VoidCallback onDeleted;
-
-  @override
-  State<_TaskDetailPane> createState() => _TaskDetailPaneState();
-}
-
-class _TaskDetailPaneState extends State<_TaskDetailPane> {
-  late final TextEditingController _titleController;
-  late final TextEditingController _descriptionController;
-  final _timeSectionKey = GlobalKey<TaskTimeSectionState>();
-  late bool _descriptionExpanded;
-
-  @override
-  void initState() {
-    super.initState();
-    _titleController = TextEditingController(text: widget.task.title);
-    _descriptionController =
-        TextEditingController(text: widget.task.description);
-    _descriptionExpanded = widget.task.description.trim().isNotEmpty;
-  }
-
-  @override
-  void didUpdateWidget(covariant _TaskDetailPane oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.task.id != widget.task.id) {
-      _titleController.text = widget.task.title;
-      _descriptionController.text = widget.task.description;
-      _descriptionExpanded = widget.task.description.trim().isNotEmpty;
-    }
-  }
-
-  @override
-  void dispose() {
-    _titleController.dispose();
-    _descriptionController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _confirmDelete(TaskItem task) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Удалить задачу?'),
-        content: Text('«${task.title}» будет удалена.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Отмена'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Удалить'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed == true && mounted) {
-      await context.read<PlannerNotifier>().removeTask(task.id);
-      widget.onDeleted();
-    }
-  }
-
-  Future<void> _saveTask() async {
-    final title = _titleController.text.trim();
-    if (title.isEmpty) return;
-
-    final time = _timeSectionKey.currentState?.collectValues();
-    if (time == null) return;
-
-    await context.read<PlannerNotifier>().updateTaskFields(
-          widget.task.id,
-          title: title,
-          description: _descriptionController.text,
-          estimateWorkingDays: time.estimateWorkingDays,
-          clearEstimateWorkingDays: time.clearEstimateWorkingDays,
-          actualWorkingDays: time.actualWorkingDays,
-          clearActualWorkingDays: time.clearActualWorkingDays,
-          employeeId: time.employeeId,
-          clearEmployeeId: time.clearEmployeeId,
-          start: time.start,
-          clearStart: time.clearStart,
-          duration: time.duration,
-          workingDays: time.workingDays,
-          clearWorkingDays: time.clearWorkingDays,
-        );
-    if (_descriptionController.text.trim().isEmpty && mounted) {
-      setState(() => _descriptionExpanded = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final notifier = context.watch<PlannerNotifier>();
-    final task = taskById(notifier.allTasks, widget.task.id) ?? widget.task;
-    final state = notifier.state;
-    final employees = state.employees;
-    final scheduled = task.isScheduled;
-    final defaultStart =
-        task.start ?? state.timelineStart.add(const Duration(hours: 9));
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Text(
-                'Задача',
-                style: theme.textTheme.labelLarge?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-              const Spacer(),
-              _ScheduleChip(scheduled: scheduled),
-              const SizedBox(width: 8),
-              FilledButton(
-                onPressed: _saveTask,
-                child: const Text('Сохранить'),
-              ),
-              IconButton(
-                icon: const Icon(Icons.delete_outline),
-                tooltip: 'Удалить',
-                onPressed: () => _confirmDelete(task),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _titleController,
-            style: theme.textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
-            decoration: TaskFieldStyle.withPrefix(
-              icon: TaskFieldStyle.title,
-              color: TaskFieldStyle.titleColor(theme.colorScheme),
-              decoration: const InputDecoration(
-                labelText: 'Название',
-                border: OutlineInputBorder(),
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          DropdownButtonFormField<TaskStatus>(
-            value: task.status,
-            decoration: const InputDecoration(
-              labelText: 'Статус',
-              border: OutlineInputBorder(),
-              isDense: true,
-            ),
-            items: TaskStatus.values
-                .map(
-                  (s) => DropdownMenuItem(
-                    value: s,
-                    child: TaskFieldStyle.statusMenuItem(context, s),
-                  ),
-                )
-                .toList(),
-            onChanged: (status) {
-              if (status != null) {
-                notifier.setTaskStatus(task.id, status);
-              }
-            },
-          ),
-          const SizedBox(height: 16),
-          TaskAppearanceSection(task: task),
-          const SizedBox(height: 16),
-          TaskTimeSection(
-            key: _timeSectionKey,
-            task: task,
-            employees: employees,
-            defaultStart: defaultStart,
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              TaskFieldStyle.sectionHeader(
-                context,
-                icon: TaskFieldStyle.description,
-                color: TaskFieldStyle.descriptionColor(theme.colorScheme),
-                title: 'Описание',
-              ),
-              const Spacer(),
-              if (!_descriptionExpanded)
-                IconButton(
-                  icon: Icon(
-                    Icons.add,
-                    color: TaskFieldStyle.descriptionColor(theme.colorScheme),
-                  ),
-                  tooltip: 'Добавить описание',
-                  visualDensity: VisualDensity.compact,
-                  onPressed: () =>
-                      setState(() => _descriptionExpanded = true),
-                ),
-            ],
-          ),
-          if (_descriptionExpanded) ...[
-            const SizedBox(height: 8),
-            TextField(
-              controller: _descriptionController,
-              minLines: 3,
-              maxLines: 12,
-              decoration: TaskFieldStyle.withPrefix(
-                icon: TaskFieldStyle.description,
-                color: TaskFieldStyle.descriptionColor(theme.colorScheme),
-                decoration: const InputDecoration(
-                  hintText: 'Текст описания',
-                  alignLabelWithHint: true,
-                  border: OutlineInputBorder(),
-                ),
-              ),
-            ),
-          ],
-          const SizedBox(height: 16),
-          TaskRelationsSection(
-            task: task,
-            onSelectTask: widget.onSelectTask,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ScheduleChip extends StatelessWidget {
-  const _ScheduleChip({
-    required this.scheduled,
-    this.compact = false,
-  });
-
-  final bool scheduled;
-  final bool compact;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: compact ? 6 : 8,
-        vertical: compact ? 2 : 4,
-      ),
-      decoration: BoxDecoration(
-        color: scheduled
-            ? theme.colorScheme.surfaceContainerHigh
-            : theme.colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            scheduled ? TaskFieldStyle.timeline : TaskFieldStyle.backlog,
-            size: compact ? 12 : 14,
-            color: scheduled
-                ? TaskFieldStyle.timelineColor(theme.colorScheme)
-                : TaskFieldStyle.backlogColor(theme.colorScheme),
-          ),
-          SizedBox(width: compact ? 4 : 6),
-          Text(
-            scheduled ? 'Таймлайн' : 'Бэклог',
-            style: theme.textTheme.labelSmall?.copyWith(
-              fontWeight: FontWeight.w600,
-              fontSize: compact ? 10 : null,
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ],
       ),
     );
   }

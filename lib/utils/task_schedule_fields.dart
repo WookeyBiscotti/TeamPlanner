@@ -34,13 +34,13 @@ DurationUnit durationUnitForTask(TaskItem task) {
   return DurationUnit.days;
 }
 
-int durationAmountForTask(TaskItem task, DurationUnit unit) {
+/// Effort amount for timeline scheduling: actual, then estimate, then legacy [workingDays].
+int effortAmountForTask(TaskItem task, DurationUnit unit) {
   if (unit == DurationUnit.days) {
-    if (task.usesWorkingDays) return task.workingDays!;
-    if (task.duration.inHours >= 24 && task.duration.inHours % 24 == 0) {
-      return task.duration.inHours ~/ 24;
-    }
-    return 1;
+    return task.actualWorkingDays ??
+        task.estimateWorkingDays ??
+        (task.usesWorkingDays ? task.workingDays! : null) ??
+        1;
   }
   return task.duration.inHours > 0 ? task.duration.inHours : 4;
 }

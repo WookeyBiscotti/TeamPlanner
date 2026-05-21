@@ -166,6 +166,28 @@ Map<String, String?> suggestEmployeeMapping(
   return result;
 }
 
+/// Uses [savedMapping] from the project, then falls back to name matching.
+Map<String, String?> resolveEmployeeMappingForImport({
+  required List<String> importNames,
+  required Map<String, String?> savedMapping,
+  required List<Employee> projectEmployees,
+}) {
+  final projectIds = projectEmployees.map((e) => e.id).toSet();
+  final byName = suggestEmployeeMapping(importNames, projectEmployees);
+  final result = <String, String?>{};
+  for (final name in importNames) {
+    if (savedMapping.containsKey(name)) {
+      final saved = savedMapping[name];
+      if (saved == null || projectIds.contains(saved)) {
+        result[name] = saved;
+        continue;
+      }
+    }
+    result[name] = byName[name];
+  }
+  return result;
+}
+
 List<TaskItem> applyEmployeeNameMapping(
   List<ParsedTaskImport> imports,
   Map<String, String?> nameToEmployeeId,
