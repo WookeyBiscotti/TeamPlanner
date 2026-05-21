@@ -34,6 +34,14 @@ DurationUnit durationUnitForTask(TaskItem task) {
   return DurationUnit.days;
 }
 
+bool _hasPositiveDays(int? days) => days != null && days > 0;
+
+/// Recorded estimate/actual effort or timeline working-days bar (list filters).
+bool taskHasLaborData(TaskItem task) =>
+    _hasPositiveDays(task.estimateWorkingDays) ||
+    _hasPositiveDays(task.actualWorkingDays) ||
+    _hasPositiveDays(task.workingDays);
+
 /// Effort amount for timeline scheduling: actual, then estimate, then legacy [workingDays].
 int effortAmountForTask(TaskItem task, DurationUnit unit) {
   if (unit == DurationUnit.days) {

@@ -330,7 +330,7 @@ class _TaskListFiltersBar extends StatelessWidget {
           ),
         ),
         chip(
-          label: 'Не оценённые',
+          label: 'Не оцененные',
           selected:
               filters.estimate.contains(TaskEstimateFilter.notEstimated),
           onSelected: () => onChanged(

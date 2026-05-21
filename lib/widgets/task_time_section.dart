@@ -139,6 +139,14 @@ class TaskTimeSectionState extends State<TaskTimeSection> {
     super.dispose();
   }
 
+  int? _effortHoursToStored(String text) {
+    final trimmed = text.trim();
+    if (trimmed.isEmpty) return null;
+    final hours = int.tryParse(trimmed);
+    if (hours == null || hours <= 0) return null;
+    return hours;
+  }
+
   int _effortAmount() {
     if (_unit == DurationUnit.days) {
       final actual = parseWorkingDaysField(_actualController.text);
@@ -155,10 +163,10 @@ class TaskTimeSectionState extends State<TaskTimeSection> {
     final actualText = _actualController.text.trim();
     final estimateWorkingDays = _unit == DurationUnit.days
         ? parseWorkingDaysField(estimateText)
-        : null;
+        : _effortHoursToStored(estimateText);
     final actualWorkingDays = _unit == DurationUnit.days
         ? parseWorkingDaysField(actualText)
-        : null;
+        : _effortHoursToStored(actualText);
     final amount = _effortAmount();
     final onTimeline = _start != null;
 

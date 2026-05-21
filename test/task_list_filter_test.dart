@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:planner/models/task_item.dart';
 import 'package:planner/models/task_list_filter.dart';
+import 'package:planner/utils/task_schedule_fields.dart';
 
 void main() {
   final now = DateTime(2026, 5, 18, 9);
@@ -11,13 +12,31 @@ void main() {
     estimateWorkingDays: 2,
   );
   final notEstimated = TaskItem(id: '2', title: 'B');
+  final actualOnly = TaskItem(
+    id: '4',
+    title: 'D',
+    actualWorkingDays: 1,
+  );
+  final timelineDaysOnly = TaskItem(
+    id: '5',
+    title: 'E',
+    start: now,
+    workingDays: 3,
+    duration: const Duration(hours: 24),
+  );
   final scheduled = TaskItem(
     id: '3',
     title: 'C',
     start: now,
     estimateWorkingDays: 1,
   );
-  final all = [estimated, notEstimated, scheduled];
+  final all = [
+    estimated,
+    notEstimated,
+    scheduled,
+    actualOnly,
+    timelineDaysOnly,
+  ];
 
   test('no filters returns all tasks', () {
     expect(filterTasksForList(all, TaskListFilters.empty), all);
@@ -27,14 +46,42 @@ void main() {
     final filters = TaskListFilters(
       estimate: {TaskEstimateFilter.estimated},
     );
-    expect(filterTasksForList(all, filters).map((t) => t.id), ['1', '3']);
+    expect(
+      filterTasksForList(all, filters).map((t) => t.id),
+      ['1', '3', '4', '5'],
+    );
+  });
+
+  test('timeline workingDays without estimate counts as estimated', () {
+    expect(taskHasLaborData(timelineDaysOnly), isTrue);
+    final filters = TaskListFilters(
+      estimate: {TaskEstimateFilter.estimated},
+    );
+    expect(
+      filterTasksForList([timelineDaysOnly], filters).map((t) => t.id),
+      ['5'],
+    );
+  });
+
+  test('not estimated filter excludes estimate and actual', () {
+    final filters = TaskListFilters(
+      estimate: {TaskEstimateFilter.notEstimated},
+    );
+    expect(filterTasksForList(all, filters).map((t) => t.id), ['2']);
   });
 
   test('schedule filter', () {
     final filters = TaskListFilters(
       schedule: {TaskScheduleFilter.notScheduled},
     );
-    expect(filterTasksForList(all, filters).map((t) => t.id), ['1', '2']);
+    expect(filterTasksForList(all, filters).map((t) => t.id), ['1', '2', '4']);
+  });
+
+  test('scheduled filter requires timeline start', () {
+    final filters = TaskListFilters(
+      schedule: {TaskScheduleFilter.scheduled},
+    );
+    expect(filterTasksForList(all, filters).map((t) => t.id), ['3', '5']);
   });
 
   test('combined filters use AND across axes', () {
@@ -42,6 +89,6 @@ void main() {
       estimate: {TaskEstimateFilter.estimated},
       schedule: {TaskScheduleFilter.scheduled},
     );
-    expect(filterTasksForList(all, filters).map((t) => t.id), ['3']);
+    expect(filterTasksForList(all, filters).map((t) => t.id), ['3', '5']);
   });
 }

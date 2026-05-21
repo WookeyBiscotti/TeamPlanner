@@ -1,3 +1,4 @@
+import '../utils/task_schedule_fields.dart';
 import 'task_item.dart';
 
 enum TaskEstimateFilter { estimated, notEstimated }
@@ -49,6 +50,7 @@ class TaskListFilters {
   }
 }
 
+/// Planned effort in working days (auto-schedule, etc.).
 bool taskHasEstimate(TaskItem task) =>
     task.estimateWorkingDays != null && task.estimateWorkingDays! > 0;
 
@@ -60,7 +62,7 @@ List<TaskItem> filterTasksForList(
 
   return tasks.where((task) {
     if (filters.estimate.isNotEmpty) {
-      final estimated = taskHasEstimate(task);
+      final estimated = taskHasLaborData(task);
       final matches = (estimated &&
               filters.estimate.contains(TaskEstimateFilter.estimated)) ||
           (!estimated &&
