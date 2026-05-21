@@ -26,6 +26,7 @@ class TaskBar extends StatefulWidget {
     required this.height,
     required this.onTap,
     this.isBlocked = false,
+    this.isEffectivelyCompleted = false,
   });
 
   final TaskItem task;
@@ -35,6 +36,7 @@ class TaskBar extends StatefulWidget {
   final double height;
   final VoidCallback onTap;
   final bool isBlocked;
+  final bool isEffectivelyCompleted;
 
   @override
   State<TaskBar> createState() => _TaskBarState();
@@ -63,7 +65,7 @@ class _TaskBarState extends State<TaskBar> {
 
     Widget barFace({required bool draggingGhost}) {
       final faceColor = faceColorForTask(
-        task: widget.task,
+        isEffectivelyCompleted: widget.isEffectivelyCompleted,
         base: base,
         isBlocked: widget.isBlocked,
       );
@@ -71,7 +73,7 @@ class _TaskBarState extends State<TaskBar> {
       final content = Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(6),
-          border: widget.isBlocked && !widget.task.isCompleted
+          border: widget.isBlocked && !widget.isEffectivelyCompleted
               ? Border.all(color: onBar.withValues(alpha: 0.85), width: 1.5)
               : null,
           boxShadow: draggingGhost
@@ -95,7 +97,7 @@ class _TaskBarState extends State<TaskBar> {
               padding: const EdgeInsets.symmetric(horizontal: 8),
               child: Row(
                 children: [
-                  if (widget.isBlocked && !widget.task.isCompleted) ...[
+                  if (widget.isBlocked && !widget.isEffectivelyCompleted) ...[
                     Icon(Icons.lock_outline, size: 12, color: onBar),
                     const SizedBox(width: 4),
                   ],
@@ -108,7 +110,7 @@ class _TaskBarState extends State<TaskBar> {
                         color: onBar,
                         fontSize: widget.height >= 26 ? 12 : 10,
                         fontWeight: FontWeight.w500,
-                        decoration: widget.task.isCompleted
+                        decoration: widget.isEffectivelyCompleted
                             ? TextDecoration.lineThrough
                             : null,
                       ),

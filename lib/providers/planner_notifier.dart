@@ -15,6 +15,7 @@ import '../services/storage_service.dart';
 import '../models/calendar_range.dart';
 import '../utils/calendar_dates.dart';
 import '../utils/calendar_ranges.dart';
+import '../utils/auto_schedule.dart';
 import '../utils/task_colors.dart';
 import '../utils/task_relations.dart';
 import '../utils/timeline_layout.dart';
@@ -251,31 +252,39 @@ class PlannerNotifier extends ChangeNotifier {
   }
 
   Future<void> removeTask(String id) async {
-    _state = _state.copyWith(
-      tasks: _state.tasks
-          .where((t) => t.id != id)
-          .map((t) {
-            var updated = t;
-            if (t.parentId == id) {
-              updated = updated.copyWith(clearParentId: true);
-            }
-            if (t.blockedByIds.contains(id)) {
-              updated = updated.copyWith(
-                blockedByIds:
-                    t.blockedByIds.where((bid) => bid != id).toList(),
-              );
-            }
-            return updated;
-          })
-          .toList(),
-    );
+    final removed = taskById(_state.tasks, id);
+    var tasks = _state.tasks
+        .where((t) => t.id != id)
+        .map((t) {
+          var updated = t;
+          if (t.parentId == id) {
+            updated = updated.copyWith(clearParentId: true);
+          }
+          if (t.blockedByIds.contains(id)) {
+            updated = updated.copyWith(
+              blockedByIds:
+                  t.blockedByIds.where((bid) => bid != id).toList(),
+            );
+          }
+          return updated;
+        })
+        .toList();
+    if (removed?.parentId != null) {
+      tasks = reconcileParentStatuses(tasks, removed!.parentId!);
+    }
+    _state = _state.copyWith(tasks: tasks);
     await _persist();
   }
 
   Future<void> setTaskStatus(String id, TaskStatus status) async {
     final index = _state.tasks.indexWhere((t) => t.id == id);
     if (index < 0) return;
-    await updateTask(_state.tasks[index].copyWith(status: status));
+    var tasks = _state.tasks
+        .map((t) => t.id == id ? t.copyWith(status: status) : t)
+        .toList();
+    tasks = reconcileParentStatuses(tasks, id);
+    _state = _state.copyWith(tasks: tasks);
+    await _persist();
   }
 
   Future<void> setTaskAppearance(
@@ -315,12 +324,23 @@ class PlannerNotifier extends ChangeNotifier {
     }
     final index = _state.tasks.indexWhere((t) => t.id == taskId);
     if (index < 0) return 'Задача не найдена';
-    await updateTask(
-      _state.tasks[index].copyWith(
-        parentId: parentId,
-        clearParentId: parentId == null,
-      ),
-    );
+    final previousParentId = _state.tasks[index].parentId;
+    var tasks = _state.tasks
+        .map(
+          (t) => t.id == taskId
+              ? t.copyWith(
+                  parentId: parentId,
+                  clearParentId: parentId == null,
+                )
+              : t,
+        )
+        .toList();
+    tasks = reconcileParentStatuses(tasks, taskId);
+    if (previousParentId != null) {
+      tasks = reconcileParentStatuses(tasks, previousParentId);
+    }
+    _state = _state.copyWith(tasks: tasks);
+    await _persist();
     return null;
   }
 
@@ -542,4 +562,17 @@ class PlannerNotifier extends ChangeNotifier {
 
   List<TaskItem> get backlogTasks =>
       _state.tasks.where((t) => !t.isOnTimeline).toList();
+
+  /// Schedules all non-completed tasks with an estimate (and required blockers).
+  /// Returns a user-facing message, or an error string.
+  Future<String> scheduleAllEstimatedTasks() async {
+    final result = computeAutoSchedule(_state);
+    if (result.error != null) return result.error!;
+    if (result.scheduledCount == 0) {
+      return 'Нет незавершённых задач с оценкой';
+    }
+    _state = _state.copyWith(tasks: result.tasks);
+    await _persist();
+    return 'Запланировано задач: ${result.scheduledCount}';
+  }
 }

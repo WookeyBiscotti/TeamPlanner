@@ -137,6 +137,10 @@ class _GanttRowState extends State<GanttRow> {
                         width: taskWidthFor(widget.state, task),
                         height: kLaneBarHeight,
                         isBlocked: isBlockedByIncomplete(task, widget.allTasks),
+                        isEffectivelyCompleted: isEffectivelyCompleted(
+                          task,
+                          widget.allTasks,
+                        ),
                         onTap: () => widget.onTaskTap(task),
                       );
                     }),

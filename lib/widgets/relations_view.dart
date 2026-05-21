@@ -208,6 +208,7 @@ class _RelationsTaskCard extends StatelessWidget {
     final theme = Theme.of(context);
     final accent = resolveTaskColor(task, theme.colorScheme);
     final blocked = isBlockedByIncomplete(task, allTasks);
+    final done = isEffectivelyCompleted(task, allTasks);
 
     return Material(
       elevation: selected ? 4 : 1,
@@ -248,7 +249,7 @@ class _RelationsTaskCard extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.bodyMedium?.copyWith(
                         fontWeight: FontWeight.w600,
-                        decoration: task.isCompleted
+                        decoration: done
                             ? TextDecoration.lineThrough
                             : null,
                       ),
@@ -271,7 +272,7 @@ class _RelationsTaskCard extends StatelessWidget {
                 size: 16,
                 color: task.status.color(theme.colorScheme),
               ),
-              if (blocked && !task.isCompleted) ...[
+              if (blocked && !done) ...[
                 const SizedBox(width: 4),
                 Icon(
                   TaskFieldStyle.blockers,

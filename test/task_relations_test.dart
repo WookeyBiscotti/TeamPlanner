@@ -26,6 +26,53 @@ void main() {
     );
   });
 
+  test('isEffectivelyCompleted requires all children closed', () {
+    final tasks = [
+      const TaskItem(id: 'p', title: 'Parent', status: TaskStatus.closed),
+      const TaskItem(id: 'c1', title: 'C1', parentId: 'p'),
+      const TaskItem(
+        id: 'c2',
+        title: 'C2',
+        parentId: 'p',
+        status: TaskStatus.closed,
+      ),
+    ];
+    expect(isEffectivelyCompleted(tasks[0], tasks), isFalse);
+    final allClosed = [
+      tasks[0],
+      const TaskItem(id: 'c1', title: 'C1', parentId: 'p', status: TaskStatus.closed),
+      tasks[2],
+    ];
+    expect(isEffectivelyCompleted(allClosed[0], allClosed), isTrue);
+  });
+
+  test('parent blocker with open child blocks dependent', () {
+    final tasks = [
+      const TaskItem(id: 'p', title: 'Parent', status: TaskStatus.closed),
+      const TaskItem(id: 'c', title: 'Child', parentId: 'p'),
+      const TaskItem(id: 'd', title: 'Dep', blockedByIds: ['p']),
+    ];
+    expect(incompleteBlockers(tasks[2], tasks).map((t) => t.id), ['p']);
+  });
+
+  test('reconcileParentStatuses closes parent when last child closes', () {
+    final tasks = [
+      const TaskItem(id: 'p', title: 'Parent'),
+      const TaskItem(id: 'c', title: 'Child', parentId: 'p', status: TaskStatus.closed),
+    ];
+    final synced = reconcileParentStatuses(tasks, 'c');
+    expect(synced.firstWhere((t) => t.id == 'p').status, TaskStatus.closed);
+  });
+
+  test('reconcileParentStatuses reopens parent when child reopens', () {
+    final tasks = [
+      const TaskItem(id: 'p', title: 'Parent', status: TaskStatus.closed),
+      const TaskItem(id: 'c', title: 'Child', parentId: 'p'),
+    ];
+    final synced = reconcileParentStatuses(tasks, 'c');
+    expect(synced.firstWhere((t) => t.id == 'p').status, TaskStatus.open);
+  });
+
   test('blocker incomplete blocks task', () {
     final tasks = [
       const TaskItem(id: 'a', title: 'A'),

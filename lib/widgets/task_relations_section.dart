@@ -178,16 +178,17 @@ class TaskRelationsSection extends StatelessWidget {
                 label: Text(
                   blocker.title,
                   style: TextStyle(
-                    decoration:
-                        blocker.isCompleted ? TextDecoration.lineThrough : null,
+                    decoration: isEffectivelyCompleted(blocker, all)
+                        ? TextDecoration.lineThrough
+                        : null,
                   ),
                 ),
                 avatar: Icon(
-                  blocker.isCompleted
+                  isEffectivelyCompleted(blocker, all)
                       ? blocker.status.icon
                       : TaskFieldStyle.blockers,
                   size: 16,
-                  color: blocker.isCompleted
+                  color: isEffectivelyCompleted(blocker, all)
                       ? blocker.status.color(theme.colorScheme)
                       : TaskFieldStyle.blockersColor(theme.colorScheme),
                 ),

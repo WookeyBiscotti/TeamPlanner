@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../constants.dart';
 import '../models/employee.dart';
 import '../models/task_item.dart';
+import '../models/task_list_filter.dart';
 import '../models/task_status.dart';
 import '../providers/planner_notifier.dart';
 import '../utils/task_appearance.dart';
@@ -113,6 +114,8 @@ class TasksPanel extends StatefulWidget {
 }
 
 class _TasksPanelState extends State<TasksPanel> {
+  TaskListFilters _filters = TaskListFilters.empty;
+
   void _ensureSelection(List<TaskItem> tasks) {
     String? next;
     if (tasks.isEmpty) {
@@ -131,6 +134,57 @@ class _TasksPanelState extends State<TasksPanel> {
   }
 
   void _select(String? id) => widget.onSelectedTaskIdChanged(id);
+
+  Future<void> _autoSchedule(
+    BuildContext context,
+    PlannerNotifier notifier,
+  ) async {
+    final tasks = notifier.allTasks;
+    final toReplan = tasks
+        .where(
+          (t) =>
+              taskHasEstimate(t) &&
+              !isEffectivelyCompleted(t, tasks) &&
+              t.isOnTimeline,
+        )
+        .length;
+    if (toReplan > 0) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Автопланирование'),
+          content: Text(
+            'Перепланировать $toReplan задач на таймлайне? '
+            'Будут учтены оценки, исполнители и блокеры. '
+            'У всех незавершённых блокеров должна быть оценка.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Отмена'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Спланировать'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !context.mounted) return;
+    }
+
+    final message = await notifier.scheduleAllEstimatedTasks();
+    if (!context.mounted) return;
+    final isError = message.contains('Циклическ') ||
+        message.contains('Добавьте хотя бы') ||
+        message.contains('Нельзя спланировать');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? Theme.of(context).colorScheme.error : null,
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -152,10 +206,15 @@ class _TasksPanelState extends State<TasksPanel> {
               const SizedBox(width: 12),
               Consumer<PlannerNotifier>(
                 builder: (context, notifier, _) {
-                  final scheduled = notifier.scheduledTasks.length;
-                  final backlog = notifier.backlogTasks.length;
+                  final all = notifier.allTasks;
+                  final visible = filterTasksForList(all, _filters);
+                  final scheduled = visible.where((t) => t.isScheduled).length;
+                  final backlog = visible.length - scheduled;
+                  final suffix = _filters.isActive && visible.length != all.length
+                      ? ' · ${visible.length} из ${all.length}'
+                      : '';
                   return Text(
-                    '$scheduled на таймлайне · $backlog вне таймлайна',
+                    '$scheduled на таймлайне · $backlog вне таймлайна$suffix',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
@@ -169,7 +228,8 @@ class _TasksPanelState extends State<TasksPanel> {
         Expanded(
           child: Consumer<PlannerNotifier>(
             builder: (context, notifier, _) {
-              final tasks = notifier.allTasks;
+              final allTasks = notifier.allTasks;
+              final tasks = filterTasksForList(allTasks, _filters);
               final tree = buildTaskTree(tasks);
               _ensureSelection(tasks);
 
@@ -185,18 +245,28 @@ class _TasksPanelState extends State<TasksPanel> {
                       children: [
                         Padding(
                           padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-                          child: Align(
-                            alignment: Alignment.centerLeft,
-                            child: FilledButton.tonalIcon(
-                              onPressed: () async {
-                                await notifier.addBacklogTask();
-                                if (!context.mounted) return;
-                                final updated = notifier.allTasks;
-                                _select(updated.last.id);
-                              },
-                              icon: const Icon(Icons.add, size: 20),
-                              label: const Text('Новая задача'),
-                            ),
+                          child: Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              FilledButton.tonalIcon(
+                                onPressed: () async {
+                                  await notifier.addBacklogTask();
+                                  if (!context.mounted) return;
+                                  final updated = notifier.allTasks;
+                                  _select(updated.last.id);
+                                },
+                                icon: const Icon(Icons.add, size: 20),
+                                label: const Text('Новая задача'),
+                              ),
+                              OutlinedButton.icon(
+                                onPressed: notifier.state.employees.isEmpty
+                                    ? null
+                                    : () => _autoSchedule(context, notifier),
+                                icon: const Icon(Icons.auto_fix_high, size: 20),
+                                label: const Text('Спланировать'),
+                              ),
+                            ],
                           ),
                         ),
                         Padding(
@@ -209,13 +279,22 @@ class _TasksPanelState extends State<TasksPanel> {
                             ),
                           ),
                         ),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(8, 0, 8, 4),
+                          child: _TaskListFiltersBar(
+                            filters: _filters,
+                            onChanged: (next) => setState(() => _filters = next),
+                          ),
+                        ),
                         Expanded(
                           child: tasks.isEmpty
                               ? Center(
                                   child: Padding(
                                     padding: const EdgeInsets.all(12),
                                     child: Text(
-                                      'Нет задач. Добавьте задачу.',
+                                      allTasks.isEmpty
+                                          ? 'Нет задач. Добавьте задачу.'
+                                          : 'Нет задач по выбранным фильтрам.',
                                       textAlign: TextAlign.center,
                                       style: theme.textTheme.bodyMedium
                                           ?.copyWith(
@@ -250,7 +329,7 @@ class _TasksPanelState extends State<TasksPanel> {
                   ),
                   const VerticalDivider(width: 1),
                   Expanded(
-                    child: tasks.isEmpty
+                    child: allTasks.isEmpty
                         ? Center(
                             child: Text(
                               'Добавьте задачу кнопкой «Новая задача»',
@@ -295,6 +374,74 @@ class _TasksPanelState extends State<TasksPanel> {
   }
 }
 
+class _TaskListFiltersBar extends StatelessWidget {
+  const _TaskListFiltersBar({
+    required this.filters,
+    required this.onChanged,
+  });
+
+  final TaskListFilters filters;
+  final ValueChanged<TaskListFilters> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    FilterChip chip({
+      required String label,
+      required bool selected,
+      required VoidCallback onSelected,
+    }) {
+      return FilterChip(
+        label: Text(label),
+        selected: selected,
+        showCheckmark: false,
+        visualDensity: VisualDensity.compact,
+        labelStyle: theme.textTheme.labelSmall,
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        onSelected: (_) => onSelected(),
+      );
+    }
+
+    return Wrap(
+      spacing: 4,
+      runSpacing: 2,
+      children: [
+        chip(
+          label: 'Оцененные',
+          selected: filters.estimate.contains(TaskEstimateFilter.estimated),
+          onSelected: () => onChanged(
+            filters.toggleEstimate(TaskEstimateFilter.estimated),
+          ),
+        ),
+        chip(
+          label: 'Не оценённые',
+          selected:
+              filters.estimate.contains(TaskEstimateFilter.notEstimated),
+          onSelected: () => onChanged(
+            filters.toggleEstimate(TaskEstimateFilter.notEstimated),
+          ),
+        ),
+        chip(
+          label: 'Запланированные',
+          selected: filters.schedule.contains(TaskScheduleFilter.scheduled),
+          onSelected: () => onChanged(
+            filters.toggleSchedule(TaskScheduleFilter.scheduled),
+          ),
+        ),
+        chip(
+          label: 'Не запланированные',
+          selected:
+              filters.schedule.contains(TaskScheduleFilter.notScheduled),
+          onSelected: () => onChanged(
+            filters.toggleSchedule(TaskScheduleFilter.notScheduled),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _TaskListTile extends StatelessWidget {
   const _TaskListTile({
     required this.task,
@@ -317,6 +464,7 @@ class _TaskListTile extends StatelessWidget {
     final theme = Theme.of(context);
     final barColor = resolveTaskColor(task, theme.colorScheme);
     final blocked = isBlockedByIncomplete(task, allTasks);
+    final done = isEffectivelyCompleted(task, allTasks);
 
     return Material(
       color: selected
@@ -338,7 +486,7 @@ class _TaskListTile extends StatelessWidget {
           padding: EdgeInsets.fromLTRB(10 + depth * 14.0, 8, 10, 8),
           child: Row(
             children: [
-              if (blocked && !task.isCompleted)
+              if (blocked && !done)
                 Padding(
                   padding: const EdgeInsets.only(right: 6),
                   child: Icon(
@@ -369,10 +517,10 @@ class _TaskListTile extends StatelessWidget {
                             overflow: TextOverflow.ellipsis,
                             style: theme.textTheme.bodyMedium?.copyWith(
                               fontWeight: FontWeight.w600,
-                              decoration: task.isCompleted
+                              decoration: done
                                   ? TextDecoration.lineThrough
                                   : null,
-                              color: task.isCompleted
+                              color: done
                                   ? theme.colorScheme.onSurfaceVariant
                                   : null,
                             ),
@@ -543,6 +691,11 @@ class _TaskDetailPaneState extends State<_TaskDetailPane> {
               ),
               const Spacer(),
               _ScheduleChip(scheduled: scheduled),
+              const SizedBox(width: 8),
+              FilledButton(
+                onPressed: _saveTask,
+                child: const Text('Сохранить'),
+              ),
               IconButton(
                 icon: const Icon(Icons.delete_outline),
                 tooltip: 'Удалить',
@@ -617,10 +770,6 @@ class _TaskDetailPaneState extends State<_TaskDetailPane> {
                   onPressed: () =>
                       setState(() => _descriptionExpanded = true),
                 ),
-              FilledButton(
-                onPressed: _saveTask,
-                child: const Text('Сохранить'),
-              ),
             ],
           ),
           if (_descriptionExpanded) ...[

@@ -1,5 +1,6 @@
 import '../models/planner_state.dart';
 import '../models/task_item.dart';
+import '../models/task_status.dart';
 import 'timeline_layout.dart';
 import 'working_days.dart';
 
@@ -96,6 +97,49 @@ List<TaskItem> childrenOf(String parentId, List<TaskItem> tasks) {
   return tasks.where((t) => t.parentId == parentId).toList();
 }
 
+bool hasTaskChildren(String taskId, List<TaskItem> tasks) {
+  return tasks.any((t) => t.parentId == taskId);
+}
+
+/// Leaf tasks use [TaskItem.isCompleted]. Parents are done when every child is done.
+bool isEffectivelyCompleted(TaskItem task, List<TaskItem> tasks) {
+  final children = childrenOf(task.id, tasks);
+  if (children.isEmpty) return task.isCompleted;
+  return children.every((c) => isEffectivelyCompleted(c, tasks));
+}
+
+/// Updates ancestor statuses after a child status or hierarchy change.
+List<TaskItem> reconcileParentStatuses(List<TaskItem> tasks, String changedId) {
+  var list = tasks;
+  var parentId = taskById(list, changedId)?.parentId;
+
+  while (parentId != null) {
+    final parentIndex = list.indexWhere((t) => t.id == parentId);
+    if (parentIndex < 0) break;
+
+    final parent = list[parentIndex];
+    final children = childrenOf(parentId, list);
+    if (children.isEmpty) break;
+
+    final allDone =
+        children.every((c) => isEffectivelyCompleted(c, list));
+    final newStatus = allDone
+        ? TaskStatus.closed
+        : (parent.status == TaskStatus.closed
+            ? TaskStatus.open
+            : parent.status);
+
+    if (parent.status == newStatus) break;
+
+    list = list
+        .map((t) => t.id == parentId ? t.copyWith(status: newStatus) : t)
+        .toList();
+    parentId = parent.parentId;
+  }
+
+  return list;
+}
+
 Set<String> descendantIds(String taskId, List<TaskItem> tasks) {
   final result = <String>{};
   void collect(String id) {
@@ -148,7 +192,7 @@ List<TaskItem> incompleteBlockers(TaskItem task, List<TaskItem> tasks) {
   return task.blockedByIds
       .map((id) => taskById(tasks, id))
       .whereType<TaskItem>()
-      .where((t) => !t.isCompleted)
+      .where((t) => !isEffectivelyCompleted(t, tasks))
       .toList();
 }
 

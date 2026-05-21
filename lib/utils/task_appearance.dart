@@ -29,11 +29,11 @@ Pattern? patternForTask(TaskItem task, Color background) {
 }
 
 Color faceColorForTask({
-  required TaskItem task,
+  required bool isEffectivelyCompleted,
   required Color base,
   required bool isBlocked,
 }) {
-  if (task.isCompleted) return base.withValues(alpha: 0.45);
+  if (isEffectivelyCompleted) return base.withValues(alpha: 0.45);
   if (isBlocked) return base.withValues(alpha: 0.55);
   return base;
 }
