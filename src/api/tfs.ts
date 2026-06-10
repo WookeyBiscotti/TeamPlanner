@@ -1,6 +1,6 @@
 import type { WorkItem, WorkItemsByAreaResult } from '../types/workItem';
 
-const API_VERSION = '7.1';
+const API_VERSION = '6.0';
 
 export interface TfsConfig {
   baseUrl: string;

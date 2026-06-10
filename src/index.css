@@ -113,6 +113,11 @@ input:not([type]) {
   border: 1px solid #cbd5e1;
   border-radius: 8px;
   background: #fff;
+  color: #0f172a;
+}
+
+input::placeholder {
+  color: #94a3b8;
 }
 
 button {
@@ -376,11 +381,23 @@ button:disabled {
   .graph-legend,
   .task-node,
   .modal-card,
-  input,
   button {
     background: #1e293b;
     color: #e2e8f0;
     border-color: #334155;
+  }
+
+  input[type='text'],
+  input[type='url'],
+  input[type='password'],
+  input:not([type]) {
+    background: #0f172a;
+    color: #f1f5f9;
+    border-color: #475569;
+  }
+
+  input::placeholder {
+    color: #64748b;
   }
 
   button.primary {
