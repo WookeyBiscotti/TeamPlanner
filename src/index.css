@@ -93,6 +93,29 @@ button {
   font-size: 1rem;
 }
 
+.filter-subtitle {
+  margin: 16px 0 10px;
+  font-size: 0.9rem;
+}
+
+.filter-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.filter-form textarea {
+  padding: 8px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+  color: #0f172a;
+  font: inherit;
+  resize: vertical;
+  min-height: 72px;
+}
+
 .filter-stats {
   font-size: 0.8rem;
   margin-bottom: 12px;
@@ -599,7 +622,8 @@ button.tiny {
   input[type='url'],
   input[type='password'],
   input:not([type]),
-  select {
+  select,
+  textarea {
     background: #0f172a;
     color: #f1f5f9;
     border-color: #475569;

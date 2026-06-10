@@ -12,13 +12,17 @@ export type ExclusionRuleType =
   | 'parentSubtree'
   | 'tag'
   | 'workItemType'
-  | 'id';
+  | 'id'
+  | 'areaPath';
+
+export type AreaPathMatch = 'exact' | 'under';
 
 export interface ExclusionRule {
   id: string;
   type: ExclusionRuleType;
   values: string[];
   label: string;
+  areaMatch?: AreaPathMatch;
 }
 
 export const EXCLUSION_RULE_LABELS: Record<ExclusionRuleType, string> = {
@@ -28,4 +32,10 @@ export const EXCLUSION_RULE_LABELS: Record<ExclusionRuleType, string> = {
   tag: 'Тег',
   workItemType: 'Тип задачи',
   id: 'ID задачи',
+  areaPath: 'Area Path',
+};
+
+export const AREA_PATH_MATCH_LABELS: Record<AreaPathMatch, string> = {
+  exact: 'Точное совпадение',
+  under: 'Включая вложенные',
 };

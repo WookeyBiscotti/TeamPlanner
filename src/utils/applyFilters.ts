@@ -1,6 +1,11 @@
 import { extractParentId } from '../api/relations';
-import type { ExclusionRule } from '../types/filters';
+import type { AreaPathMatch, ExclusionRule } from '../types/filters';
 import type { WorkItem } from '../types/workItem';
+
+function areaPathMatches(area: string, pattern: string, match: AreaPathMatch): boolean {
+  if (match === 'exact') return area === pattern;
+  return area === pattern || area.startsWith(`${pattern}\\`);
+}
 
 function parseTags(raw: unknown): string[] {
   if (typeof raw !== 'string' || !raw.trim()) return [];
@@ -33,6 +38,12 @@ function itemMatchesRule(item: WorkItem, rule: ExclusionRule): boolean {
     }
     case 'id':
       return rule.values.includes(String(item.id));
+    case 'areaPath': {
+      const area = item.fields['System.AreaPath'];
+      if (typeof area !== 'string') return false;
+      const match = rule.areaMatch ?? 'under';
+      return rule.values.some((pattern) => areaPathMatches(area, pattern, match));
+    }
     default:
       return false;
   }

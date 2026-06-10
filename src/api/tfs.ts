@@ -1,4 +1,4 @@
-import { relatedWorkItemIds } from './relations';
+import { findMissingChildIds, relatedWorkItemIds } from './relations';
 import type { WorkItem, WorkItemsByAreaResult } from '../types/workItem';
 
 export { extractBlockerIds, extractParentId, workItemIdFromUrl } from './relations';
@@ -169,6 +169,28 @@ export async function getWorkItemWithRelations(
     byId.set(item.id, item);
   }
   return [...byId.values()].sort((a, b) => a.id - b.id);
+}
+
+/** Догружает прямых потомков, на которых ссылаются relations загруженных задач. */
+export async function loadMissingChildren(
+  config: TfsConfig,
+  items: WorkItem[],
+): Promise<{ items: WorkItem[]; addedCount: number }> {
+  const missingIds = findMissingChildIds(items);
+  if (missingIds.length === 0) {
+    return { items, addedCount: 0 };
+  }
+
+  const children = await fetchWorkItemsBatch(config, missingIds);
+  const byId = new Map(items.map((item) => [item.id, item]));
+  for (const child of children) {
+    byId.set(child.id, child);
+  }
+
+  return {
+    items: [...byId.values()].sort((a, b) => a.id - b.id),
+    addedCount: children.length,
+  };
 }
 
 export async function getWorkItemsByArea(

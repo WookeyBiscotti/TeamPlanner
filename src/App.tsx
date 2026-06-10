@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 
-import { getWorkItemWithRelations, getWorkItemsByArea } from './api/tfs';
+import { findMissingChildIds } from './api/relations';
+import { getWorkItemWithRelations, getWorkItemsByArea, loadMissingChildren } from './api/tfs';
 import { ConfigDialog } from './components/ConfigDialog';
 import { FieldSchemaSettings } from './components/FieldSchemaSettings';
 import { ItemFilterPanel } from './components/ItemFilterPanel';
@@ -40,6 +41,11 @@ export default function App() {
   const visibleItems = useMemo(
     () => applyExclusionRules(loadedItems, exclusionRules),
     [loadedItems, exclusionRules],
+  );
+
+  const missingChildrenCount = useMemo(
+    () => findMissingChildIds(loadedItems).length,
+    [loadedItems],
   );
 
   const showConfig = ready && (!config || configOpen);
@@ -99,6 +105,20 @@ export default function App() {
     setExclusionRules([]);
   }, []);
 
+  const handleLoadChildren = useCallback(async () => {
+    if (!config || missingChildrenCount === 0) return;
+    setLoading(true);
+    setError('');
+    try {
+      const { items } = await loadMissingChildren(config, loadedItems);
+      setLoadedItems(items);
+    } catch (exc) {
+      setError(exc instanceof Error ? exc.message : String(exc));
+    } finally {
+      setLoading(false);
+    }
+  }, [config, loadedItems, missingChildrenCount]);
+
   if (!ready) {
     return <div className="app-loading">Загрузка…</div>;
   }
@@ -143,10 +163,13 @@ export default function App() {
           <ItemFilterPanel
             loadedCount={loadedItems.length}
             visibleCount={visibleItems.length}
+            missingChildrenCount={missingChildrenCount}
+            loading={loading}
             rules={exclusionRules}
             onAddRule={handleAddExclusionRule}
             onRemoveRule={handleRemoveExclusionRule}
             onClearRules={handleClearExclusionRules}
+            onLoadChildren={handleLoadChildren}
           />
         </div>
         <TaskGraph

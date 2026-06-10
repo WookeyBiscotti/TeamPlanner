@@ -78,6 +78,27 @@ export function relatedWorkItemIds(item: WorkItem): number[] {
   return [...ids];
 }
 
+export function extractChildIds(item: WorkItem): number[] {
+  const ids: number[] = [];
+  for (const relation of item.relations ?? []) {
+    if (relation.rel !== 'System.LinkTypes.Hierarchy-Forward') continue;
+    const id = workItemIdFromUrl(relation.url);
+    if (id != null) ids.push(id);
+  }
+  return ids;
+}
+
+export function findMissingChildIds(items: WorkItem[]): number[] {
+  const loaded = new Set(items.map((item) => item.id));
+  const missing = new Set<number>();
+  for (const item of items) {
+    for (const childId of extractChildIds(item)) {
+      if (!loaded.has(childId)) missing.add(childId);
+    }
+  }
+  return [...missing].sort((a, b) => a - b);
+}
+
 /** @deprecated Используйте extractAllRelationEdges */
 export function extractParentId(item: WorkItem): number | null {
   for (const relation of item.relations ?? []) {
