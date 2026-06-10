@@ -22,13 +22,72 @@ export interface WorkItemsByAreaResult {
   items: WorkItem[];
 }
 
-export type EdgeKind = 'parent' | 'blocker';
+export type EdgeKind =
+  | 'parent-child'
+  | 'dependency'
+  | 'related'
+  | 'remote-dependency'
+  | 'test'
+  | 'other';
+
+export interface RelationTypeConfig {
+  kind: EdgeKind;
+  label: string;
+  shortLabel: string;
+  color: string;
+}
+
+export const RELATION_TYPES: RelationTypeConfig[] = [
+  {
+    kind: 'parent-child',
+    label: 'Родитель → ребёнок',
+    shortLabel: 'родитель',
+    color: '#475569',
+  },
+  {
+    kind: 'dependency',
+    label: 'Предшественник → последователь',
+    shortLabel: 'зависимость',
+    color: '#dc2626',
+  },
+  {
+    kind: 'related',
+    label: 'Связанные',
+    shortLabel: 'связан',
+    color: '#2563eb',
+  },
+  {
+    kind: 'remote-dependency',
+    label: 'Удалённая зависимость',
+    shortLabel: 'удал. зав.',
+    color: '#ea580c',
+  },
+  {
+    kind: 'test',
+    label: 'Тестирование',
+    shortLabel: 'тест',
+    color: '#7c3aed',
+  },
+  {
+    kind: 'other',
+    label: 'Прочие связи',
+    shortLabel: 'прочее',
+    color: '#94a3b8',
+  },
+];
+
+export const ALL_EDGE_KINDS: EdgeKind[] = RELATION_TYPES.map((item) => item.kind);
+
+export function relationConfig(kind: EdgeKind): RelationTypeConfig {
+  return RELATION_TYPES.find((item) => item.kind === kind) ?? RELATION_TYPES.at(-1)!;
+}
 
 export interface GraphEdge {
   id: string;
   source: string;
   target: string;
   kind: EdgeKind;
+  rel: string;
 }
 
 export interface TNodeField {

@@ -164,37 +164,102 @@ button:disabled {
   flex-direction: column;
 }
 
-.graph-legend {
+.graph-toolbar {
   display: flex;
   gap: 16px;
-  align-items: center;
+  align-items: flex-start;
   padding: 12px 16px;
   background: #ffffff;
   border-bottom: 1px solid #e2e8f0;
 }
 
-.legend-item::before {
-  content: '';
-  display: inline-block;
-  width: 24px;
-  height: 3px;
-  margin-right: 8px;
-  vertical-align: middle;
-  border-radius: 2px;
-}
-
-.legend-item.parent::before {
-  background: #64748b;
-}
-
-.legend-item.blocker::before {
-  background: #dc2626;
-}
-
 .legend-count {
   margin-left: auto;
+  flex-shrink: 0;
   color: #64748b;
   font-size: 0.875rem;
+  padding-top: 2px;
+}
+
+.link-filter {
+  flex: 1;
+  min-width: 0;
+}
+
+.link-filter-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.link-filter-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.link-filter-actions {
+  display: flex;
+  gap: 4px;
+}
+
+button.tiny {
+  padding: 2px 6px;
+  font-size: 0.75rem;
+}
+
+.link-filter-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.link-filter-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  user-select: none;
+  opacity: 0.55;
+  transition: opacity 0.15s, border-color 0.15s;
+}
+
+.link-filter-item.active {
+  opacity: 1;
+  border-color: var(--link-color);
+  background: color-mix(in srgb, var(--link-color) 8%, white);
+}
+
+.link-filter-item input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.link-filter-swatch {
+  width: 18px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--link-color);
+  flex-shrink: 0;
+}
+
+.link-filter-label {
+  white-space: nowrap;
+}
+
+.link-filter-count {
+  color: #64748b;
+  font-variant-numeric: tabular-nums;
+}
+
+.graph-panel .react-flow__minimap {
+  box-shadow: 0 4px 12px rgb(15 23 42 / 0.25);
 }
 
 .graph-panel .react-flow {
@@ -378,7 +443,7 @@ button:disabled {
 
   .app-header,
   .load-panel,
-  .graph-legend,
+  .graph-toolbar,
   .task-node,
   .modal-card,
   button {
@@ -398,6 +463,15 @@ button:disabled {
 
   input::placeholder {
     color: #64748b;
+  }
+
+  .link-filter-item {
+    border-color: #334155;
+    background: #1e293b;
+  }
+
+  .link-filter-item.active {
+    background: color-mix(in srgb, var(--link-color) 18%, #1e293b);
   }
 
   button.primary {

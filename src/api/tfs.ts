@@ -1,4 +1,7 @@
+import { relatedWorkItemIds } from './relations';
 import type { WorkItem, WorkItemsByAreaResult } from '../types/workItem';
+
+export { extractBlockerIds, extractParentId, workItemIdFromUrl } from './relations';
 
 const API_VERSION = '6.0';
 
@@ -37,11 +40,6 @@ async function tfsFetch(
   }
 
   return response;
-}
-
-function workItemIdFromUrl(url: string): number | null {
-  const match = /\/workItems\/(\d+)(?:\?|$)/i.exec(url);
-  return match ? Number.parseInt(match[1], 10) : null;
 }
 
 function parseExcludeStates(raw: string[]): string[] {
@@ -122,26 +120,6 @@ export async function getWorkItem(config: TfsConfig, id: number): Promise<WorkIt
   return (await response.json()) as WorkItem;
 }
 
-function relatedWorkItemIds(item: WorkItem): number[] {
-  const ids = new Set<number>();
-  const parentId = extractParentId(item);
-  if (parentId != null) ids.add(parentId);
-  for (const blockerId of extractBlockerIds(item)) {
-    ids.add(blockerId);
-  }
-  for (const relation of item.relations ?? []) {
-    if (
-      relation.rel === 'System.LinkTypes.Hierarchy-Forward' ||
-      relation.rel === 'System.LinkTypes.Dependency-Forward'
-    ) {
-      const relatedId = workItemIdFromUrl(relation.url);
-      if (relatedId != null) ids.add(relatedId);
-    }
-  }
-  ids.delete(item.id);
-  return [...ids];
-}
-
 /** Загружает задачу и все связанные work items из её relations. */
 export async function getWorkItemWithRelations(
   config: TfsConfig,
@@ -177,26 +155,6 @@ export async function getWorkItemsByArea(
     count: items.length,
     items,
   };
-}
-
-export function extractParentId(item: WorkItem): number | null {
-  for (const relation of item.relations ?? []) {
-    if (relation.rel === 'System.LinkTypes.Hierarchy-Reverse') {
-      const id = workItemIdFromUrl(relation.url);
-      if (id != null) return id;
-    }
-  }
-  return null;
-}
-
-export function extractBlockerIds(item: WorkItem): number[] {
-  const ids: number[] = [];
-  for (const relation of item.relations ?? []) {
-    if (relation.rel !== 'System.LinkTypes.Dependency-Reverse') continue;
-    const id = workItemIdFromUrl(relation.url);
-    if (id != null) ids.push(id);
-  }
-  return ids;
 }
 
 export function fieldDisplayValue(fields: WorkItem['fields'], key: string): string {
