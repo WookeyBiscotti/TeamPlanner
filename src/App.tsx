@@ -4,6 +4,7 @@ import { getWorkItemWithRelations, getWorkItemsByArea } from './api/tfs';
 import { ConfigDialog } from './components/ConfigDialog';
 import { FieldSchemaSettings } from './components/FieldSchemaSettings';
 import { LoadPanel } from './components/LoadPanel';
+import { StatusColorSettings } from './components/StatusColorSettings';
 import { TaskGraph } from './components/TaskGraph';
 import { useStoredConfig } from './hooks/useStoredConfig';
 import type { WorkItem } from './types/workItem';
@@ -16,6 +17,12 @@ export default function App() {
     clearConfig,
     nodeFields,
     setNodeFields,
+    layoutAlgorithm,
+    setLayoutAlgorithm,
+    colorByStatus,
+    setColorByStatus,
+    statusColors,
+    setStatusColors,
   } = useStoredConfig();
 
   const [items, setItems] = useState<WorkItem[]>([]);
@@ -23,6 +30,7 @@ export default function App() {
   const [error, setError] = useState('');
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [schemaOpen, setSchemaOpen] = useState(false);
+  const [statusColorsOpen, setStatusColorsOpen] = useState(false);
   const [configOpen, setConfigOpen] = useState(false);
 
   const showConfig = ready && (!config || configOpen);
@@ -81,6 +89,9 @@ export default function App() {
           <button type="button" onClick={() => setSchemaOpen(true)}>
             Схема полей
           </button>
+          <button type="button" onClick={() => setStatusColorsOpen(true)}>
+            Цвета статусов
+          </button>
           <button
             type="button"
             onClick={() => setConfigOpen(true)}
@@ -107,6 +118,10 @@ export default function App() {
           items={items}
           nodeFields={nodeFields}
           selectedId={selectedId}
+          layoutAlgorithm={layoutAlgorithm}
+          onLayoutAlgorithmChange={setLayoutAlgorithm}
+          colorByStatus={colorByStatus}
+          statusColors={statusColors}
           onSelect={setSelectedId}
         />
       </main>
@@ -125,6 +140,16 @@ export default function App() {
         selected={nodeFields}
         onChange={setNodeFields}
         onClose={() => setSchemaOpen(false)}
+      />
+
+      <StatusColorSettings
+        open={statusColorsOpen}
+        items={items}
+        colorByStatus={colorByStatus}
+        statusColors={statusColors}
+        onColorByStatusChange={setColorByStatus}
+        onStatusColorsChange={setStatusColors}
+        onClose={() => setStatusColorsOpen(false)}
       />
     </div>
   );

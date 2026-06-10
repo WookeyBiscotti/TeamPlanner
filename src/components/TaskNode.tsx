@@ -1,16 +1,24 @@
+import type { CSSProperties } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 
 import { fieldDisplayValue } from '../api/tfs';
+import { getStatusColor } from '../utils/statusColors';
 import type { TaskNodeData } from '../utils/buildGraph';
 
 export function TaskNode({ data, selected }: NodeProps) {
   const nodeData = data as TaskNodeData;
-  const { item, fields } = nodeData;
+  const { item, fields, colorByStatus, statusColors } = nodeData;
   const titleField = fields.find((field) => field.key === 'System.Title');
   const otherFields = fields.filter((field) => field.key !== 'System.Title');
+  const accentColor = colorByStatus
+    ? getStatusColor(item.fields['System.State'], statusColors)
+    : '#2563eb';
 
   return (
-    <div className={`task-node${selected ? ' selected' : ''}`}>
+    <div
+      className={`task-node${selected ? ' selected' : ''}`}
+      style={{ '--node-accent-color': accentColor } as CSSProperties}
+    >
       <Handle type="target" position={Position.Top} />
       <div className="task-node-accent" />
       <div className="task-node-body">

@@ -1,6 +1,6 @@
-import dagre from 'dagre';
 import { MarkerType, type Edge, type Node } from '@xyflow/react';
 
+import type { LayoutAlgorithm } from '../types/layout';
 import { extractAllRelationEdges } from '../api/relations';
 import {
   relationConfig,
@@ -9,15 +9,15 @@ import {
   type TNodeField,
   type WorkItem,
 } from '../types/workItem';
+import { computeNodePositions } from './layoutAlgorithms';
 
 export interface TaskNodeData extends Record<string, unknown> {
   item: WorkItem;
   fields: TNodeField[];
   selected: boolean;
+  colorByStatus: boolean;
+  statusColors: Record<string, string>;
 }
-
-const NODE_WIDTH = 260;
-const NODE_HEIGHT = 120;
 
 export function buildGraphEdges(items: WorkItem[]): GraphEdge[] {
   const ids = new Set(items.map((item) => item.id));
@@ -59,49 +59,8 @@ export function filterGraphEdges(
   return edges.filter((edge) => visibleKinds.has(edge.kind));
 }
 
-export function layoutGraph(
-  items: WorkItem[],
-  graphEdges: GraphEdge[],
-): { nodes: Node<TaskNodeData>[]; edges: Edge[] } {
-  const g = new dagre.graphlib.Graph();
-  g.setDefaultEdgeLabel(() => ({}));
-  g.setGraph({
-    rankdir: 'TB',
-    nodesep: 90,
-    ranksep: 110,
-    edgesep: 50,
-    marginx: 40,
-    marginy: 40,
-  });
-
-  for (const item of items) {
-    g.setNode(String(item.id), { width: NODE_WIDTH, height: NODE_HEIGHT });
-  }
-
-  for (const edge of graphEdges) {
-    g.setEdge(edge.source, edge.target);
-  }
-
-  dagre.layout(g);
-
-  const nodes: Node<TaskNodeData>[] = items.map((item) => {
-    const node = g.node(String(item.id));
-    return {
-      id: String(item.id),
-      type: 'task',
-      position: {
-        x: (node?.x ?? 0) - NODE_WIDTH / 2,
-        y: (node?.y ?? 0) - NODE_HEIGHT / 2,
-      },
-      data: {
-        item,
-        fields: [],
-        selected: false,
-      },
-    };
-  });
-
-  const edges: Edge[] = graphEdges.map((edge) => {
+function buildFlowEdges(graphEdges: GraphEdge[]): Edge[] {
+  return graphEdges.map((edge) => {
     const config = relationConfig(edge.kind);
     return {
       id: edge.id,
@@ -126,6 +85,36 @@ export function layoutGraph(
       labelBgBorderRadius: 4,
     };
   });
+}
 
-  return { nodes, edges };
+export function layoutGraph(
+  items: WorkItem[],
+  graphEdges: GraphEdge[],
+  algorithm: LayoutAlgorithm,
+  options: {
+    colorByStatus: boolean;
+    statusColors: Record<string, string>;
+  },
+): { nodes: Node<TaskNodeData>[]; edges: Edge[] } {
+  const nodeIds = items.map((item) => String(item.id));
+  const positions = computeNodePositions(nodeIds, graphEdges, algorithm);
+
+  const nodes: Node<TaskNodeData>[] = items.map((item) => {
+    const id = String(item.id);
+    const position = positions.get(id) ?? { x: 0, y: 0 };
+    return {
+      id,
+      type: 'task',
+      position,
+      data: {
+        item,
+        fields: [],
+        selected: false,
+        colorByStatus: options.colorByStatus,
+        statusColors: options.statusColors,
+      },
+    };
+  });
+
+  return { nodes, edges: buildFlowEdges(graphEdges) };
 }

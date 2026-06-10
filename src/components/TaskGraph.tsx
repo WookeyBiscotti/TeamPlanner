@@ -6,23 +6,27 @@ import {
   ReactFlow,
   useEdgesState,
   useNodesState,
+  useReactFlow,
   type Node,
   type NodeTypes,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
+import type { LayoutAlgorithm } from '../types/layout';
 import {
   ALL_EDGE_KINDS,
   type EdgeKind,
   type TNodeField,
   type WorkItem,
 } from '../types/workItem';
+import { getStatusColor } from '../utils/statusColors';
 import {
   buildGraphEdges,
   filterGraphEdges,
   layoutGraph,
   type TaskNodeData,
 } from '../utils/buildGraph';
+import { LayoutSelector } from './LayoutSelector';
 import { LinkFilter } from './LinkFilter';
 import { TaskNode } from './TaskNode';
 
@@ -33,19 +37,40 @@ const nodeTypes: NodeTypes = {
 const MIN_ZOOM = 0.05;
 const MAX_ZOOM = 2;
 
-function minimapNodeColor(node: Node): string {
+function minimapNodeColor(
+  node: Node,
+  colorByStatus: boolean,
+  statusColors: Record<string, string>,
+): string {
   const data = node.data as TaskNodeData;
   if (node.selected) return '#3b82f6';
-  const state = data.item.fields['System.State'];
-  if (state === 'Closed' || state === 'Removed') return '#64748b';
-  if (state === 'Active' || state === 'In Progress') return '#22c55e';
+  if (colorByStatus) {
+    return getStatusColor(data.item.fields['System.State'], statusColors);
+  }
   return '#cbd5e1';
+}
+
+function FitViewOnLayout({ layoutKey }: { layoutKey: string }) {
+  const { fitView } = useReactFlow();
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      fitView({ padding: 0.2, maxZoom: 1, duration: 200 });
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [layoutKey, fitView]);
+
+  return null;
 }
 
 interface TaskGraphProps {
   items: WorkItem[];
   nodeFields: TNodeField[];
   selectedId: number | null;
+  layoutAlgorithm: LayoutAlgorithm;
+  onLayoutAlgorithmChange: (value: LayoutAlgorithm) => void;
+  colorByStatus: boolean;
+  statusColors: Record<string, string>;
   onSelect: (id: number | null) => void;
 }
 
@@ -53,6 +78,10 @@ export function TaskGraph({
   items,
   nodeFields,
   selectedId,
+  layoutAlgorithm,
+  onLayoutAlgorithmChange,
+  colorByStatus,
+  statusColors,
   onSelect,
 }: TaskGraphProps) {
   const [visibleLinks, setVisibleLinks] = useState<Set<EdgeKind>>(
@@ -73,28 +102,49 @@ export function TaskGraph({
     return counts;
   }, [allGraphEdges]);
 
+  const layoutKey = `${layoutAlgorithm}:${items.map((i) => i.id).join(',')}:${graphEdges.map((e) => e.id).join(',')}`;
+
   const layout = useMemo(
-    () => layoutGraph(items, graphEdges),
-    [items, graphEdges],
+    () =>
+      layoutGraph(items, graphEdges, layoutAlgorithm, {
+        colorByStatus,
+        statusColors,
+      }),
+    [items, graphEdges, layoutAlgorithm, colorByStatus, statusColors],
   );
 
   const [nodes, setNodes, onNodesChange] = useNodesState(layout.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(layout.edges);
 
   useEffect(() => {
-    const next = layoutGraph(items, graphEdges);
+    const next = layoutGraph(items, graphEdges, layoutAlgorithm, {
+      colorByStatus,
+      statusColors,
+    });
     setNodes(
       next.nodes.map((node) => ({
         ...node,
         data: {
           ...node.data,
           fields: nodeFields,
+          colorByStatus,
+          statusColors,
         },
         selected: selectedId != null && node.id === String(selectedId),
       })),
     );
     setEdges(next.edges);
-  }, [items, graphEdges, nodeFields, selectedId, setNodes, setEdges]);
+  }, [
+    items,
+    graphEdges,
+    layoutAlgorithm,
+    nodeFields,
+    selectedId,
+    colorByStatus,
+    statusColors,
+    setNodes,
+    setEdges,
+  ]);
 
   if (items.length === 0) {
     return (
@@ -107,6 +157,10 @@ export function TaskGraph({
   return (
     <div className="graph-panel">
       <div className="graph-toolbar">
+        <LayoutSelector
+          value={layoutAlgorithm}
+          onChange={onLayoutAlgorithmChange}
+        />
         <LinkFilter
           visible={visibleLinks}
           onChange={setVisibleLinks}
@@ -122,17 +176,16 @@ export function TaskGraph({
         nodeTypes={nodeTypes}
         minZoom={MIN_ZOOM}
         maxZoom={MAX_ZOOM}
-        fitView
-        fitViewOptions={{ padding: 0.2, maxZoom: 1 }}
         onNodeClick={(_, node) => onSelect(Number.parseInt(node.id, 10))}
         onPaneClick={() => onSelect(null)}
       >
+        <FitViewOnLayout layoutKey={layoutKey} />
         <Background gap={20} color="#cbd5e1" />
         <Controls showInteractive={false} />
         <MiniMap
           pannable
           zoomable
-          nodeColor={minimapNodeColor}
+          nodeColor={(node) => minimapNodeColor(node, colorByStatus, statusColors)}
           nodeStrokeColor="#0f172a"
           nodeStrokeWidth={2}
           maskColor="rgb(15 23 42 / 0.55)"
