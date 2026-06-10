@@ -18,6 +18,8 @@ export interface WorkItemsByAreaResult {
   area: string;
   exact: boolean;
   excludeStates: string[];
+  includeStates: string[];
+  includeTags: string[];
   count: number;
   items: WorkItem[];
 }

@@ -42,9 +42,13 @@ async function tfsFetch(
   return response;
 }
 
-function parseExcludeStates(raw: string[]): string[] {
+function escapeWiql(value: string): string {
+  return value.replace(/'/g, "''");
+}
+
+function parseList(values: string[]): string[] {
   const result: string[] = [];
-  for (const entry of raw) {
+  for (const entry of values) {
     for (const part of entry.split(',')) {
       const trimmed = part.trim();
       if (trimmed) result.push(trimmed);
@@ -53,19 +57,49 @@ function parseExcludeStates(raw: string[]): string[] {
   return [...new Set(result)];
 }
 
-function buildAreaWiql(area: string, exact: boolean, excludeStates: string[]): string {
-  const escapedArea = area.replace(/'/g, "''");
+export interface AreaQueryOptions {
+  exact?: boolean;
+  excludeStates?: string[];
+  includeStates?: string[];
+  includeTags?: string[];
+}
+
+function buildAreaWiql(
+  area: string,
+  exact: boolean,
+  options: AreaQueryOptions,
+): string {
+  const escapedArea = escapeWiql(area);
   const areaClause = exact
     ? `[System.AreaPath] = '${escapedArea}'`
     : `[System.AreaPath] UNDER '${escapedArea}'`;
 
-  const states = parseExcludeStates(excludeStates);
-  const stateClause =
-    states.length > 0
-      ? ` AND [System.State] NOT IN (${states.map((s) => `'${s.replace(/'/g, "''")}'`).join(', ')})`
-      : '';
+  const clauses: string[] = [areaClause];
 
-  return `SELECT [System.Id] FROM WorkItems WHERE ${areaClause}${stateClause} ORDER BY [System.Id]`;
+  const includeStates = parseList(options.includeStates ?? []);
+  const excludeStates = parseList(options.excludeStates ?? []);
+  const includeTags = parseList(options.includeTags ?? []);
+
+  if (includeStates.length > 0) {
+    clauses.push(
+      `[System.State] IN (${includeStates.map((s) => `'${escapeWiql(s)}'`).join(', ')})`,
+    );
+  } else if (excludeStates.length > 0) {
+    clauses.push(
+      `[System.State] NOT IN (${excludeStates.map((s) => `'${escapeWiql(s)}'`).join(', ')})`,
+    );
+  }
+
+  if (includeTags.length === 1) {
+    clauses.push(`[System.Tags] CONTAINS '${escapeWiql(includeTags[0])}'`);
+  } else if (includeTags.length > 1) {
+    const tagExpr = includeTags
+      .map((tag) => `[System.Tags] CONTAINS '${escapeWiql(tag)}'`)
+      .join(' OR ');
+    clauses.push(`(${tagExpr})`);
+  }
+
+  return `SELECT [System.Id] FROM WorkItems WHERE ${clauses.join(' AND ')} ORDER BY [System.Id]`;
 }
 
 async function queryWorkItemIds(
@@ -140,18 +174,19 @@ export async function getWorkItemWithRelations(
 export async function getWorkItemsByArea(
   config: TfsConfig,
   area: string,
-  options: { exact?: boolean; excludeStates?: string[] } = {},
+  options: AreaQueryOptions = {},
 ): Promise<WorkItemsByAreaResult> {
   const exact = options.exact ?? false;
-  const excludeStates = options.excludeStates ?? [];
-  const wiql = buildAreaWiql(area, exact, excludeStates);
+  const wiql = buildAreaWiql(area, exact, options);
   const ids = await queryWorkItemIds(config, wiql);
   const items = await fetchWorkItemsBatch(config, ids);
 
   return {
     area,
     exact,
-    excludeStates: parseExcludeStates(excludeStates),
+    excludeStates: parseList(options.excludeStates ?? []),
+    includeStates: parseList(options.includeStates ?? []),
+    includeTags: parseList(options.includeTags ?? []),
     count: items.length,
     items,
   };

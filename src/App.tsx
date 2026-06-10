@@ -1,13 +1,16 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 import { getWorkItemWithRelations, getWorkItemsByArea } from './api/tfs';
 import { ConfigDialog } from './components/ConfigDialog';
 import { FieldSchemaSettings } from './components/FieldSchemaSettings';
+import { ItemFilterPanel } from './components/ItemFilterPanel';
 import { LoadPanel } from './components/LoadPanel';
 import { StatusColorSettings } from './components/StatusColorSettings';
 import { TaskGraph } from './components/TaskGraph';
 import { useStoredConfig } from './hooks/useStoredConfig';
+import type { AreaLoadQuery, ExclusionRule } from './types/filters';
 import type { WorkItem } from './types/workItem';
+import { applyExclusionRules } from './utils/applyFilters';
 
 export default function App() {
   const {
@@ -25,7 +28,8 @@ export default function App() {
     setStatusColors,
   } = useStoredConfig();
 
-  const [items, setItems] = useState<WorkItem[]>([]);
+  const [loadedItems, setLoadedItems] = useState<WorkItem[]>([]);
+  const [exclusionRules, setExclusionRules] = useState<ExclusionRule[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -33,19 +37,27 @@ export default function App() {
   const [statusColorsOpen, setStatusColorsOpen] = useState(false);
   const [configOpen, setConfigOpen] = useState(false);
 
+  const visibleItems = useMemo(
+    () => applyExclusionRules(loadedItems, exclusionRules),
+    [loadedItems, exclusionRules],
+  );
+
   const showConfig = ready && (!config || configOpen);
 
   const handleLoadByArea = useCallback(
-    async (area: string, exact: boolean, excludeStates: string[]) => {
+    async (query: AreaLoadQuery) => {
       if (!config) return;
       setLoading(true);
       setError('');
       try {
-        const data = await getWorkItemsByArea(config, area, {
-          exact,
-          excludeStates,
+        const data = await getWorkItemsByArea(config, query.area, {
+          exact: query.exact,
+          excludeStates: query.excludeStates,
+          includeStates: query.includeStates,
+          includeTags: query.includeTags,
         });
-        setItems(data.items);
+        setLoadedItems(data.items);
+        setExclusionRules([]);
         setSelectedId(null);
       } catch (exc) {
         setError(exc instanceof Error ? exc.message : String(exc));
@@ -63,7 +75,8 @@ export default function App() {
       setError('');
       try {
         const loaded = await getWorkItemWithRelations(config, id);
-        setItems(loaded);
+        setLoadedItems(loaded);
+        setExclusionRules([]);
         setSelectedId(id);
       } catch (exc) {
         setError(exc instanceof Error ? exc.message : String(exc));
@@ -73,6 +86,18 @@ export default function App() {
     },
     [config],
   );
+
+  const handleAddExclusionRule = useCallback((rule: ExclusionRule) => {
+    setExclusionRules((prev) => [...prev, rule]);
+  }, []);
+
+  const handleRemoveExclusionRule = useCallback((id: string) => {
+    setExclusionRules((prev) => prev.filter((rule) => rule.id !== id));
+  }, []);
+
+  const handleClearExclusionRules = useCallback(() => {
+    setExclusionRules([]);
+  }, []);
 
   if (!ready) {
     return <div className="app-loading">Загрузка…</div>;
@@ -109,13 +134,23 @@ export default function App() {
       {loading && <div className="banner">Загрузка задач…</div>}
 
       <main className="app-main">
-        <LoadPanel
-          loading={loading}
-          onLoadByArea={handleLoadByArea}
-          onLoadById={handleLoadById}
-        />
+        <div className="sidebar">
+          <LoadPanel
+            loading={loading}
+            onLoadByArea={handleLoadByArea}
+            onLoadById={handleLoadById}
+          />
+          <ItemFilterPanel
+            loadedCount={loadedItems.length}
+            visibleCount={visibleItems.length}
+            rules={exclusionRules}
+            onAddRule={handleAddExclusionRule}
+            onRemoveRule={handleRemoveExclusionRule}
+            onClearRules={handleClearExclusionRules}
+          />
+        </div>
         <TaskGraph
-          items={items}
+          items={visibleItems}
           nodeFields={nodeFields}
           selectedId={selectedId}
           layoutAlgorithm={layoutAlgorithm}
@@ -144,7 +179,7 @@ export default function App() {
 
       <StatusColorSettings
         open={statusColorsOpen}
-        items={items}
+        items={loadedItems}
         colorByStatus={colorByStatus}
         statusColors={statusColors}
         onColorByStatusChange={setColorByStatus}

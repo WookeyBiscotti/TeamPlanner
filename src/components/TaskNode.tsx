@@ -5,22 +5,34 @@ import { fieldDisplayValue } from '../api/tfs';
 import { getStatusColor } from '../utils/statusColors';
 import type { TaskNodeData } from '../utils/buildGraph';
 
+function nodeSurfaceStyle(
+  colorByStatus: boolean,
+  statusColor: string,
+): CSSProperties {
+  if (!colorByStatus) {
+    return {};
+  }
+  return {
+    '--node-status-color': statusColor,
+    '--node-bg': `color-mix(in srgb, ${statusColor} 28%, #ffffff)`,
+    '--node-border': statusColor,
+    '--node-text': '#0f172a',
+  } as CSSProperties;
+}
+
 export function TaskNode({ data, selected }: NodeProps) {
   const nodeData = data as TaskNodeData;
   const { item, fields, colorByStatus, statusColors } = nodeData;
   const titleField = fields.find((field) => field.key === 'System.Title');
   const otherFields = fields.filter((field) => field.key !== 'System.Title');
-  const accentColor = colorByStatus
-    ? getStatusColor(item.fields['System.State'], statusColors)
-    : '#2563eb';
+  const statusColor = getStatusColor(item.fields['System.State'], statusColors);
 
   return (
     <div
-      className={`task-node${selected ? ' selected' : ''}`}
-      style={{ '--node-accent-color': accentColor } as CSSProperties}
+      className={`task-node${selected ? ' selected' : ''}${colorByStatus ? ' color-by-status' : ''}`}
+      style={nodeSurfaceStyle(colorByStatus, statusColor)}
     >
       <Handle type="target" position={Position.Top} />
-      <div className="task-node-accent" />
       <div className="task-node-body">
         {titleField ? (
           <div className="task-node-title">
