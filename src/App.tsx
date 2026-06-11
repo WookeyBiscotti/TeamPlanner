@@ -1,17 +1,19 @@
 import { useCallback, useMemo, useState } from 'react';
+import type { IFilterSet } from '@svar-ui/filter-store';
 
 import { findMissingChildIds } from './api/relations';
 import { getWorkItemWithRelations, getWorkItemsByArea, loadMissingChildren } from './api/tfs';
 import { ConfigDialog } from './components/ConfigDialog';
 import { FieldSchemaSettings } from './components/FieldSchemaSettings';
-import { ItemFilterPanel } from './components/ItemFilterPanel';
 import { LoadPanel } from './components/LoadPanel';
+import { RawDataModal } from './components/RawDataModal';
 import { StatusColorSettings } from './components/StatusColorSettings';
+import { TaskFilterPanel } from './components/TaskFilterPanel';
 import { TaskGraph } from './components/TaskGraph';
 import { useStoredConfig } from './hooks/useStoredConfig';
-import type { AreaLoadQuery, ExclusionRule } from './types/filters';
+import type { AreaLoadQuery } from './types/filters';
 import type { WorkItem } from './types/workItem';
-import { applyExclusionRules } from './utils/applyFilters';
+import { getMatchedItemIds } from './utils/workItemFilter';
 
 export default function App() {
   const {
@@ -27,21 +29,39 @@ export default function App() {
     setColorByStatus,
     statusColors,
     setStatusColors,
+    filterMode,
+    setFilterMode,
+    filterEffect,
+    setFilterEffect,
+    highlightColor,
+    setHighlightColor,
   } = useStoredConfig();
 
   const [loadedItems, setLoadedItems] = useState<WorkItem[]>([]);
-  const [exclusionRules, setExclusionRules] = useState<ExclusionRule[]>([]);
+  const [filterValue, setFilterValue] = useState<IFilterSet | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [expandedIds, setExpandedIds] = useState<Set<number>>(() => new Set());
+  const [rawItem, setRawItem] = useState<WorkItem | null>(null);
   const [schemaOpen, setSchemaOpen] = useState(false);
   const [statusColorsOpen, setStatusColorsOpen] = useState(false);
   const [configOpen, setConfigOpen] = useState(false);
 
-  const visibleItems = useMemo(
-    () => applyExclusionRules(loadedItems, exclusionRules),
-    [loadedItems, exclusionRules],
+  const matchedIds = useMemo(
+    () => getMatchedItemIds(loadedItems, filterValue),
+    [loadedItems, filterValue],
   );
+
+  const graphItems = useMemo(() => {
+    if (filterEffect !== 'hide' || matchedIds == null) return loadedItems;
+    return loadedItems.filter((item) => matchedIds.has(item.id));
+  }, [loadedItems, filterEffect, matchedIds]);
+
+  const highlightedIds = useMemo(() => {
+    if (filterEffect !== 'highlight' || matchedIds == null) return null;
+    return matchedIds;
+  }, [filterEffect, matchedIds]);
 
   const missingChildrenCount = useMemo(
     () => findMissingChildIds(loadedItems).length,
@@ -63,7 +83,8 @@ export default function App() {
           includeTags: query.includeTags,
         });
         setLoadedItems(data.items);
-        setExclusionRules([]);
+        setFilterValue(null);
+        setExpandedIds(new Set());
         setSelectedId(null);
       } catch (exc) {
         setError(exc instanceof Error ? exc.message : String(exc));
@@ -82,7 +103,8 @@ export default function App() {
       try {
         const loaded = await getWorkItemWithRelations(config, id);
         setLoadedItems(loaded);
-        setExclusionRules([]);
+        setFilterValue(null);
+        setExpandedIds(new Set());
         setSelectedId(id);
       } catch (exc) {
         setError(exc instanceof Error ? exc.message : String(exc));
@@ -92,18 +114,6 @@ export default function App() {
     },
     [config],
   );
-
-  const handleAddExclusionRule = useCallback((rule: ExclusionRule) => {
-    setExclusionRules((prev) => [...prev, rule]);
-  }, []);
-
-  const handleRemoveExclusionRule = useCallback((id: string) => {
-    setExclusionRules((prev) => prev.filter((rule) => rule.id !== id));
-  }, []);
-
-  const handleClearExclusionRules = useCallback(() => {
-    setExclusionRules([]);
-  }, []);
 
   const handleLoadChildren = useCallback(async () => {
     if (!config || missingChildrenCount === 0) return;
@@ -118,6 +128,23 @@ export default function App() {
       setLoading(false);
     }
   }, [config, loadedItems, missingChildrenCount]);
+
+  const handleToggleExpand = useCallback((id: number) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const handleShowRaw = useCallback(
+    (id: number) => {
+      const item = loadedItems.find((entry) => entry.id === id) ?? null;
+      setRawItem(item);
+    },
+    [loadedItems],
+  );
 
   if (!ready) {
     return <div className="app-loading">Загрузка…</div>;
@@ -160,27 +187,36 @@ export default function App() {
             onLoadByArea={handleLoadByArea}
             onLoadById={handleLoadById}
           />
-          <ItemFilterPanel
-            loadedCount={loadedItems.length}
-            visibleCount={visibleItems.length}
+          <TaskFilterPanel
+            items={loadedItems}
             missingChildrenCount={missingChildrenCount}
             loading={loading}
-            rules={exclusionRules}
-            onAddRule={handleAddExclusionRule}
-            onRemoveRule={handleRemoveExclusionRule}
-            onClearRules={handleClearExclusionRules}
+            filterMode={filterMode}
+            onFilterModeChange={setFilterMode}
+            filterValue={filterValue}
+            onFilterChange={setFilterValue}
+            filterEffect={filterEffect}
+            onFilterEffectChange={setFilterEffect}
+            highlightColor={highlightColor}
+            onHighlightColorChange={setHighlightColor}
+            matchedCount={matchedIds?.size ?? null}
             onLoadChildren={handleLoadChildren}
           />
         </div>
         <TaskGraph
-          items={visibleItems}
+          items={graphItems}
           nodeFields={nodeFields}
           selectedId={selectedId}
+          expandedIds={expandedIds}
+          highlightedIds={highlightedIds}
+          highlightColor={highlightColor}
           layoutAlgorithm={layoutAlgorithm}
           onLayoutAlgorithmChange={setLayoutAlgorithm}
           colorByStatus={colorByStatus}
           statusColors={statusColors}
           onSelect={setSelectedId}
+          onToggleExpand={handleToggleExpand}
+          onShowRaw={handleShowRaw}
         />
       </main>
 
@@ -209,6 +245,8 @@ export default function App() {
         onStatusColorsChange={setStatusColors}
         onClose={() => setStatusColorsOpen(false)}
       />
+
+      <RawDataModal item={rawItem} onClose={() => setRawItem(null)} />
     </div>
   );
 }

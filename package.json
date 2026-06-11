@@ -9,6 +9,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@svar-ui/filter-store": "^2.6.0",
+    "@svar-ui/react-filter": "^2.6.0",
     "@xyflow/react": "^12.6.0",
     "d3-force": "^3.0.0",
     "dagre": "^0.8.5",

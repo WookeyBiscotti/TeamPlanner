@@ -462,6 +462,96 @@ button.tiny {
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--node-border, #2563eb) 40%, #2563eb);
 }
 
+.task-node.filter-highlight {
+  box-shadow: 0 0 0 4px var(--filter-highlight-color, #f59e0b);
+}
+
+.task-node.expanded {
+  width: 300px;
+}
+
+.task-node-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  padding: 4px 6px 0;
+}
+
+.task-node-raw-btn {
+  font-family: ui-monospace, monospace;
+  line-height: 1;
+}
+
+.task-node-body {
+  cursor: pointer;
+}
+
+.task-node-description {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed #cbd5e1;
+}
+
+.task-node-description-label {
+  font-size: 0.7rem;
+  color: #64748b;
+  margin-bottom: 4px;
+}
+
+.task-node-description-text {
+  font-size: 0.75rem;
+  line-height: 1.35;
+  max-height: 120px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.filter-mode-tabs {
+  display: flex;
+  gap: 6px;
+  margin: 12px 0;
+}
+
+.filter-mode-tabs button {
+  flex: 1;
+  padding: 6px 8px;
+  font-size: 0.8rem;
+}
+
+.filter-mode-tabs button.active {
+  background: #2563eb;
+  border-color: #2563eb;
+  color: #fff;
+}
+
+.filter-effect-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.filter-effect-row label {
+  font-size: 0.8rem;
+  min-width: 140px;
+}
+
+.svar-filter-host {
+  overflow: visible;
+}
+
+.raw-data-pre {
+  margin: 0;
+  max-height: 60vh;
+  overflow: auto;
+  padding: 12px;
+  background: #0f172a;
+  color: #e2e8f0;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
 .task-node-body {
   padding: 10px 12px;
   min-width: 0;
@@ -650,6 +740,15 @@ button.tiny {
 
   .filter-rules li {
     border-color: #334155;
+  }
+
+  .task-node-description {
+    border-top-color: #475569;
+  }
+
+  .filter-mode-tabs button.active {
+    background: #3b82f6;
+    border-color: #3b82f6;
   }
 
   button.primary {

@@ -15,8 +15,12 @@ export interface TaskNodeData extends Record<string, unknown> {
   item: WorkItem;
   fields: TNodeField[];
   selected: boolean;
+  expanded: boolean;
   colorByStatus: boolean;
   statusColors: Record<string, string>;
+  highlightColor: string | null;
+  onToggleExpand?: (id: number) => void;
+  onShowRaw?: (id: number) => void;
 }
 
 export function buildGraphEdges(items: WorkItem[]): GraphEdge[] {
@@ -110,8 +114,10 @@ export function layoutGraph(
         item,
         fields: [],
         selected: false,
+        expanded: false,
         colorByStatus: options.colorByStatus,
         statusColors: options.statusColors,
+        highlightColor: null,
       },
     };
   });

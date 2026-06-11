@@ -15,7 +15,12 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
-    "noUncheckedSideEffectImports": true
+    "noUncheckedSideEffectImports": true,
+    "paths": {
+      "@svar-ui/filter-store": [
+        "./node_modules/@svar-ui/filter-store/dist/types/src/index.d.ts"
+      ]
+    }
   },
   "include": ["src"]
 }

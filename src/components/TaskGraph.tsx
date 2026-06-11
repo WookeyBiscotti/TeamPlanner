@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Background,
   Controls,
@@ -67,22 +67,32 @@ interface TaskGraphProps {
   items: WorkItem[];
   nodeFields: TNodeField[];
   selectedId: number | null;
+  expandedIds: Set<number>;
+  highlightedIds: Set<number> | null;
+  highlightColor: string;
   layoutAlgorithm: LayoutAlgorithm;
   onLayoutAlgorithmChange: (value: LayoutAlgorithm) => void;
   colorByStatus: boolean;
   statusColors: Record<string, string>;
   onSelect: (id: number | null) => void;
+  onToggleExpand: (id: number) => void;
+  onShowRaw: (id: number) => void;
 }
 
 export function TaskGraph({
   items,
   nodeFields,
   selectedId,
+  expandedIds,
+  highlightedIds,
+  highlightColor,
   layoutAlgorithm,
   onLayoutAlgorithmChange,
   colorByStatus,
   statusColors,
   onSelect,
+  onToggleExpand,
+  onShowRaw,
 }: TaskGraphProps) {
   const [visibleLinks, setVisibleLinks] = useState<Set<EdgeKind>>(
     () => new Set(ALL_EDGE_KINDS),
@@ -116,6 +126,14 @@ export function TaskGraph({
   const [nodes, setNodes, onNodesChange] = useNodesState(layout.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(layout.edges);
 
+  const nodeHighlight = useCallback(
+    (id: string) => {
+      if (!highlightedIds) return null;
+      return highlightedIds.has(Number.parseInt(id, 10)) ? highlightColor : null;
+    },
+    [highlightedIds, highlightColor],
+  );
+
   useEffect(() => {
     const next = layoutGraph(items, graphEdges, layoutAlgorithm, {
       colorByStatus,
@@ -129,6 +147,10 @@ export function TaskGraph({
           fields: nodeFields,
           colorByStatus,
           statusColors,
+          expanded: expandedIds.has(Number.parseInt(node.id, 10)),
+          highlightColor: nodeHighlight(node.id),
+          onToggleExpand,
+          onShowRaw,
         },
         selected: selectedId != null && node.id === String(selectedId),
       })),
@@ -140,8 +162,12 @@ export function TaskGraph({
     layoutAlgorithm,
     nodeFields,
     selectedId,
+    expandedIds,
     colorByStatus,
     statusColors,
+    nodeHighlight,
+    onToggleExpand,
+    onShowRaw,
     setNodes,
     setEdges,
   ]);
@@ -176,6 +202,7 @@ export function TaskGraph({
         nodeTypes={nodeTypes}
         minZoom={MIN_ZOOM}
         maxZoom={MAX_ZOOM}
+        nodesDraggable
         onNodeClick={(_, node) => onSelect(Number.parseInt(node.id, 10))}
         onPaneClick={() => onSelect(null)}
       >
